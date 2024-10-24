@@ -1,13 +1,23 @@
 warnings.filterwarnings('ignore')
 rerun_existing = True
 
+timing_file = PATH["data"] / "analysis_results_time.csv"
+timing_data = []
+
 for placeid, placeinfo in cities.items():
     print(placeid + ": Analyzing existing infrastructure.")
+
+    # Start total timing
+    start_time_total = time.time()
     
-    # output_place is one static file for the existing city. This can be compared to the generated infrastructure.
-    # Make a check if this file was already generated - it only needs to be done once. If not, generate it:
+    # Filename check
+    start_time_check = time.time()
     filename = placeid + "_existing.csv"
-    if rerun_existing or not os.path.isfile(PATH["results"] + placeid + "/" + filename):
+    rerun_check = rerun_existing or not os.path.isfile(PATH["results"] + placeid + "/" + filename)
+    end_time_check = time.time()
+    check_duration = end_time_check - start_time_check
+
+    if rerun_check:
         empty_metrics = {
                          "length":0,
                          "length_lcc":0,
@@ -27,12 +37,13 @@ for placeid, placeinfo in cities.items():
         for networktype in networktypes:
             output_place[networktype] = copy.deepcopy(empty_metrics)
 
-        # Analyze all networks     
+        # Analyze all networks
+        start_time_networks = time.time()
         Gs = {}
         for networktype in networktypes:
             if networktype != "biketrack_onstreet" and networktype != "bikeable_offstreet":
-                Gs[networktype] = csv_to_ig(PATH["data"] + placeid + "/", placeid, networktype)
-                Gs[networktype + "_simplified"] = csv_to_ig(PATH["data"] + placeid + "/", placeid, networktype + "_simplified")
+                Gs[networktype] = csv_to_ig(PATH["data"] / placeid, placeid, networktype)
+                Gs[networktype + "_simplified"] = csv_to_ig(PATH["data"] / placeid , placeid, networktype + "_simplified")
             elif networktype == "biketrack_onstreet":
                 Gs[networktype] = intersect_igraphs(Gs["biketrack"], Gs["carall"])
                 Gs[networktype + "_simplified"] = intersect_igraphs(Gs["biketrack_simplified"], Gs["carall_simplified"])
@@ -43,59 +54,120 @@ for placeid, placeinfo in cities.items():
                 G_temp = copy.deepcopy(Gs["bikeable_simplified"])
                 delete_overlaps(G_temp, Gs["carall_simplified"])
                 Gs[networktype + "_simplified"] = G_temp
-        
-        with open(PATH["data"] + placeid + "/" + placeid + '_poi_' + poi_source + '_nnidscarall.csv') as f:
-            nnids = [int(line.rstrip()) for line in f]
+        end_time_networks = time.time()
+        network_analysis_duration = end_time_networks - start_time_networks
 
-            
+        # Load POIs
+        start_time_poi = time.time()
+        with open(Path(PATH["data"]) / placeid / f"{placeid}_poi_{poi_source}_nnidscarall.csv") as f:
+            nnids = [int(line.rstrip()) for line in f]
+        end_time_poi = time.time()
+        poi_loading_duration = end_time_poi - start_time_poi
+
+        # Metrics calculation
+        start_time_metrics = time.time()
         covs = {}
-        for networktype in tqdm(networktypes, desc = "Networks", leave = False):
+        for networktype in tqdm(networktypes, desc="Networks", leave=False):
             if debug: print(placeid + ": Analyzing results: " + networktype)
             metrics, cov = calculate_metrics(Gs[networktype], Gs[networktype + "_simplified"], Gs['carall'], nnids, empty_metrics, buffer_walk, numnodepairs, debug)
             for key, val in metrics.items():
                 output_place[networktype][key] = val
             covs[networktype] = cov
-        # Save the covers
+        end_time_metrics = time.time()
+        metrics_duration = end_time_metrics - start_time_metrics
+
+        # Save covers
         write_result(covs, "pickle", placeid, "", "", "existing_covers.pickle")
-        
+
         # Write to CSV
         write_result(output_place, "dictnested", placeid, "", "", "existing.csv", empty_metrics)
+
+    # End total timing
+    end_time_total = time.time()
+    total_duration = end_time_total - start_time_total
+
+    # Append timing data
+    timing_data.append([placeid, "Check File Existence", check_duration])
+    timing_data.append([placeid, "Network Analysis", network_analysis_duration])
+    timing_data.append([placeid, "POI Loading", poi_loading_duration])
+    timing_data.append([placeid, "Metrics Calculation", metrics_duration])
+    timing_data.append([placeid, "Total Process Time", total_duration])
 
 
 
 for placeid, placeinfo in cities.items():
     print(placeid + ": Analyzing results")
 
+    # Start total timing
+    start_time_total = time.time()
+
     # Load networks
-    G_carall = csv_to_ig(PATH["data"] + placeid + "/", placeid, 'carall')
+    start_time_load_networks = time.time()
+    G_carall = csv_to_ig(PATH["data"] / placeid , placeid, 'carall')
     Gexisting = {}
     for networktype in ["biketrack", "bikeable"]:
-        Gexisting[networktype] = csv_to_ig(PATH["data"] + placeid + "/", placeid, networktype)
-        
-    
+        Gexisting[networktype] = csv_to_ig(PATH["data"] / placeid , placeid, networktype)
+    end_time_load_networks = time.time()
+    network_loading_duration = end_time_load_networks - start_time_load_networks
+
     # Load POIs
-    with open(PATH["data"] + placeid + "/" + placeid + '_poi_' + poi_source + '_nnidscarall.csv') as f:
+    start_time_poi = time.time()
+    file_path = Path(PATH["data"]) / placeid / f"{placeid}_poi_{poi_source}_nnidscarall.csv"
+    with open(file_path) as f:
         nnids = [int(line.rstrip()) for line in f]
-            
+    end_time_poi = time.time()
+    poi_loading_duration = end_time_poi - start_time_poi
+
     # Load results
-    filename = placeid + '_poi_' + poi_source + "_" + prune_measure
-    resultfile = open(PATH["results"] + placeid + "/" + filename + ".pickle",'rb')
-    res = pickle.load(resultfile)
-    resultfile.close()
-    if debug: pp.pprint(res)
-         
-    # Calculate
-    # output contains lists for all the prune_quantile values of the corresponding results
-    output, covs = calculate_metrics_additively(res["GTs"], res["GT_abstracts"], res["prune_quantiles"], G_carall, nnids, buffer_walk, numnodepairs, debug, True, Gexisting)
-    output_MST, cov_MST = calculate_metrics(res["MST"], res["MST_abstract"], G_carall, nnids, output, buffer_walk, numnodepairs, debug, True, ig.Graph(), Polygon(), False, Gexisting)
-        
+    start_time_load_results = time.time()
+    filename = f"{placeid}_poi_{poi_source}_{prune_measure}.pickle"
+    resultfile_path = PATH["results"] / placeid / filename
+    with open(resultfile_path, 'rb') as resultfile:
+        res = pickle.load(resultfile)
+    end_time_load_results = time.time()
+    result_loading_duration = end_time_load_results - start_time_load_results
+
+    # Calculate metrics
+    start_time_metrics = time.time()
+    output, covs = calculate_metrics_additively(
+        res["GTs"], res["GT_abstracts"], res["prune_quantiles"], G_carall, nnids,
+        buffer_walk, numnodepairs, debug, True, Gexisting
+    )
+    output_MST, cov_MST = calculate_metrics(
+        res["MST"], res["MST_abstract"], G_carall, nnids, output,
+        buffer_walk, numnodepairs, debug, True, ig.Graph(), Polygon(), False, Gexisting
+    )
+    end_time_metrics = time.time()
+    metrics_calculation_duration = end_time_metrics - start_time_metrics
+
     # Save the covers
+    start_time_save_covers = time.time()
     write_result(covs, "pickle", placeid, poi_source, prune_measure, "_covers.pickle")
-#     write_result(covs_carminusbike, "pickle", placeid, poi_source, prune_measure, "_covers_carminusbike.pickle")
     write_result(cov_MST, "pickle", placeid, poi_source, prune_measure, "_cover_mst.pickle")
-        
+    end_time_save_covers = time.time()
+    covers_saving_duration = end_time_save_covers - start_time_save_covers
+
     # Write to CSV
+    start_time_csv = time.time()
     write_result(output, "dict", placeid, poi_source, prune_measure, ".csv")
-#     write_result(output_carminusbike, "dict", placeid, poi_source, prune_measure, "_carminusbike.csv")
-#     write_result(output_carconstrictedbike, "dict", placeid, poi_source, prune_measure, "_carconstrictedbike.csv")
     write_result(output_MST, "dict", placeid, poi_source, "", "mst.csv")
+    end_time_csv = time.time()
+    csv_writing_duration = end_time_csv - start_time_csv
+
+    # End total timing
+    end_time_total = time.time()
+    total_duration = end_time_total - start_time_total
+
+    # Append timing data
+    timing_data.append([placeid, "Network Loading", network_loading_duration])
+    timing_data.append([placeid, "POI Loading", poi_loading_duration])
+    timing_data.append([placeid, "Results Loading", result_loading_duration])
+    timing_data.append([placeid, "Metrics Calculation", metrics_calculation_duration])
+    timing_data.append([placeid, "Saving Covers", covers_saving_duration])
+    timing_data.append([placeid, "CSV Writing", csv_writing_duration])
+    timing_data.append([placeid, "Total Process Time", total_duration])
+    
+with open(timing_file, mode='w', newline='') as file:
+writer = csv.writer(file)
+writer.writerow(["PlaceID", "Process", "Time (seconds)"])  # CSV header
+writer.writerows(timing_data)

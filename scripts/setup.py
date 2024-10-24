@@ -14,6 +14,7 @@ pp = pprint.PrettyPrinter(indent=4)
 from tqdm.notebook import tqdm
 import warnings
 import shutil
+import time
 
 # Math/Data
 import math
@@ -53,12 +54,14 @@ import geojson
 # If a city has a proper shapefile through nominatim
 # In case no (False), manual download of shapefile is necessary, see below
 cities = {}
-with open(PATH["parameters"] + 'cities.csv') as f:
+current_dir = os.getcwd()
+print("Current working directory:", current_dir)
+with open(PATH["parameters"] / 'cities.csv', mode='r', encoding='utf-8') as f:
     csvreader = csv.DictReader(f, delimiter=';')
     for row in csvreader:
         cities[row['placeid']] = {}
         for field in csvreader.fieldnames[1:]:
-            cities[row['placeid']][field] = row[field]     
+            cities[row['placeid']][field] = row[field]    
 if debug:
     print("\n\n=== Cities ===")
     pp.pprint(cities)
@@ -67,10 +70,10 @@ if debug:
 # Create city subfolders  
 for placeid, placeinfo in cities.items():
     for subfolder in ["data", "plots", "plots_networks", "results", "exports", "exports_json", "videos"]:
-        placepath = PATH[subfolder] + placeid + "/"
-        if not os.path.exists(placepath):
-            os.makedirs(placepath)
-            print("Successfully created folder " + placepath)
+        placepath = PATH[subfolder] / placeid  
+        if not placepath.exists():
+            placepath.mkdir(parents=True, exist_ok=True)  
+            print(f"Successfully created folder {placepath}")
 
 from IPython.display import Audio
 sound_file = '../dingding.mp3'

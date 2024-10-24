@@ -1,9 +1,9 @@
 debug = False
 
-exec(open("../parameters/parameters.py").read())
-exec(open("../code/path.py").read())
-exec(open("../code/setup.py").read())
-exec(open("../code/functions.py").read())
+exec(open("../../parameters/parameters.py").read())
+exec(open("../../scripts/path.py").read())
+exec(open("../../scripts/setup.py").read())
+exec(open("../../scripts/functions.py").read())
 
 if __name__ == '__main__':
     if len(sys.argv) > 1: # limit to specific city
@@ -11,6 +11,8 @@ if __name__ == '__main__':
         cityid = list(cities.keys())[citynumber]
         print(cityid)
         cities = {k:v for (k,v) in cities.items() if k == cityid}
+        if citynumber > smallcitythreshold:
+            prune_quantiles = [0.5,1]
 
     poi_source_list = ["grid", "railwaystation"]
     prune_measure_list = ["betweenness", "closeness", "random"]
@@ -24,5 +26,5 @@ if __name__ == '__main__':
     for poi_source, prune_measure in parsets_used:
         print(poi_source, prune_measure)
 
-        print("Running 09.py")
-        exec(open("09.py").read())
+        print("Running export_carconstrictedbikes.py")
+        exec(open("export_carconstrictedbikes.py").read())

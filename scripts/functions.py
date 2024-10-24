@@ -250,107 +250,183 @@ def osm_to_ig(node, edge):
     return G
 
 
-def compress_file(p, f, filetype = ".csv", delete_uncompressed = True):
-    with zipfile.ZipFile(p + f + ".zip", 'w', zipfile.ZIP_DEFLATED) as zfile:
-        zfile.write(p + f + filetype, f + filetype)
-    if delete_uncompressed: os.remove(p + f + filetype)
+def compress_file(folder, filename):
+    file_path = Path(folder) / f"{filename}.csv"
+    compressed_file_path = Path(folder) / f"{filename}.zip"
+    
+    # Compress the file
+    with open(file_path, 'rb') as f_in:
+        with zipfile.ZipFile(compressed_file_path, 'w', zipfile.ZIP_DEFLATED) as f_out:
+            f_out.write(file_path, arcname=file_path.name)  # Keep the original name within the zip
 
-def ox_to_csv(G, p, placeid, parameterid, postfix = "", compress = True, verbose = True):
+    #print(f"Compressed: {file_path} -> {compressed_file_path}")
+        
+def ox_to_csv(G, p: Path, placeid: str, parameterid: str, postfix: str = "", compress: bool = True, verbose: bool = True):
+    # Set CRS if not already present
     if "crs" not in G.graph:
-        G.graph["crs"] = 'epsg:4326' # needed for OSMNX's graph_to_gdfs in utils_graph.py
+        G.graph["crs"] = 'epsg:4326'  # needed for OSMNX's graph_to_gdfs in utils_graph.py
+
+    # Attempt to convert the graph to GeoDataFrames
     try:
         node, edge = ox.graph_to_gdfs(G)
     except ValueError:
         node, edge = gpd.GeoDataFrame(), gpd.GeoDataFrame()
-    prefix = placeid + '_' + parameterid + postfix
 
-    node.to_csv(p + prefix + '_nodes.csv', index = True)
-    if compress: compress_file(p, prefix + '_nodes')
- 
-    edge.to_csv(p + prefix + '_edges.csv', index = True)
-    if compress: compress_file(p, prefix + '_edges')
+    # Create the file prefix
+    prefix = f"{placeid}_{parameterid}{postfix}"
 
-    if verbose: print(placeid + ": Successfully wrote graph " + parameterid + postfix)
+    # Define file paths using pathlib
+    node_file_path = p / f"{prefix}_nodes.csv"
+    edge_file_path = p / f"{prefix}_edges.csv"
 
-def check_extract_zip(p, prefix):
-    """ Check if a zip file prefix+'_nodes.zip' and + prefix+'_edges.zip'
-    is available at path p. If so extract it and return True, otherwise False.
-    If you call this function, remember to clean up (i.e. delete the unzipped files)
+    # Write the node and edge data to CSV files
+    node.to_csv(node_file_path, index=True)
+    if compress:
+        compress_file(p, f"{prefix}_nodes")  # Use f-string for the filename
+
+    edge.to_csv(edge_file_path, index=True)
+    if compress:
+        compress_file(p, f"{prefix}_edges")  # Use f-string for the filename
+
+    if verbose:
+        print(f"{placeid}: Successfully wrote graph {parameterid}{postfix}")
+
+
+def check_extract_zip(p: Path, prefix: str) -> bool:
+    """ Check if a zip file prefix+'_nodes.zip' and prefix+'_edges.zip'
+    is available at path p. If so, extract it and return True; otherwise, return False.
+    If you call this function, remember to clean up (i.e., delete the unzipped files)
     after you are done like this:
 
     if compress:
-        os.remove(p + prefix + '_nodes.csv')
-        os.remove(p + prefix + '_edges.csv')
+        os.remove(p / f'{prefix}_nodes.csv')
+        os.remove(p / f'{prefix}_edges.csv')
     """
 
+    nodes_zip = p / f"{prefix}_nodes.zip"
+    edges_zip = p / f"{prefix}_edges.zip"
+
     try: # Use zip files if available
-        with zipfile.ZipFile(p + prefix + '_nodes.zip', 'r') as zfile:
-            zfile.extract(prefix + '_nodes.csv', p)
-        with zipfile.ZipFile(p + prefix + '_edges.zip', 'r') as zfile:
-            zfile.extract(prefix + '_edges.csv', p)
+        with zipfile.ZipFile(nodes_zip, 'r') as zfile:
+            zfile.extract(f"{prefix}_nodes.csv", p)
+        with zipfile.ZipFile(edges_zip, 'r') as zfile:
+            zfile.extract(f"{prefix}_edges.csv", p)
         return True
-    except:
+    except FileNotFoundError:
+        print(f"Zip files not found: {nodes_zip}, {edges_zip}")
+        return False
+    except Exception as e:
+        print(f"An error occurred while extracting zip files: {e}")
         return False
 
-
-def csv_to_ox(p, placeid, parameterid):
+def csv_to_ox(p: Path, placeid: str, parameterid: str) -> nx.MultiDiGraph:
     """ Load a networkx graph from _edges.csv and _nodes.csv
     The edge file must have attributes u,v,osmid,length
     The node file must have attributes y,x,osmid
     Only these attributes are loaded.
     """
-    prefix = placeid + '_' + parameterid
+    prefix = f"{placeid}_{parameterid}"
     compress = check_extract_zip(p, prefix)
     
-    with open(p + prefix + '_edges.csv', 'r') as f:
-        header = f.readline().strip().split(",")
+    edges_file = p / f"{prefix}_edges.csv"
+    nodes_file = p / f"{prefix}_nodes.csv"
 
-        lines = []
-        for line in csv.reader(f, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL, skipinitialspace=True):
-            line_list = [c for c in line]
-            osmid = str(eval(line_list[header.index("osmid")])[0]) if isinstance(eval(line_list[header.index("osmid")]), list) else line_list[header.index("osmid")] # If this is a list due to multiedges, just load the first osmid
-            length = str(eval(line_list[header.index("length")])[0]) if isinstance(eval(line_list[header.index("length")]), list) else line_list[header.index("length")] # If this is a list due to multiedges, just load the first osmid
-            line_string = "" + line_list[header.index("u")] + " "+ line_list[header.index("v")] + " " + osmid + " " + length
-            lines.append(line_string)
-        G = nx.parse_edgelist(lines, nodetype = int, data = (("osmid", int),("length", float)), create_using = nx.MultiDiGraph) # MultiDiGraph is necessary for OSMNX, for example for get_undirected(G) in utils_graph.py
-    with open(p + prefix + '_nodes.csv', 'r') as f:
-        header = f.readline().strip().split(",")
-        values_x = {}
-        values_y = {}
-        for line in csv.reader(f, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL, skipinitialspace=True):
-            line_list = [c for c in line]
-            osmid = int(line_list[header.index("osmid")])
-            values_x[osmid] = float(line_list[header.index("x")])
-            values_y[osmid] = float(line_list[header.index("y")])
+    # Load edges
+    lines = []
+    try:
+        with edges_file.open('r') as f:
+            header = f.readline().strip().split(",")
+            for line in csv.reader(f, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL, skipinitialspace=True):
+                line_list = [c.strip() for c in line]  # Trim whitespace
+                if len(line_list) < len(header):
+                    continue  # Skip lines with insufficient data
 
+                try:
+                    u = line_list[header.index("u")].rstrip(',')  # Remove any trailing commas
+                    v = line_list[header.index("v")].rstrip(',')
+                    osmid = line_list[header.index("osmid")]
+                    length = line_list[header.index("length")]
+
+                    # Handle potential list data and empty values
+                    osmid = str(eval(osmid)[0]) if isinstance(eval(osmid), list) else osmid
+                    length = str(eval(length)[0]) if isinstance(eval(length), list) else length
+
+                    # Build the line string
+                    line_string = f"{u} {v} {osmid} {length}"
+                    lines.append(line_string)
+
+                except (IndexError, SyntaxError, TypeError):
+                    continue  # Skip if evaluation fails
+
+        # Create the graph
+        G = nx.parse_edgelist(
+            lines,
+            nodetype=int,
+            data=(("osmid", int), ("length", float)),
+            create_using=nx.MultiDiGraph
+        )
+    except FileNotFoundError:
+        print(f"Error: The file {edges_file} does not exist.")
+        return None  # Or handle as appropriate
+
+    # Load nodes
+    values_x = {}
+    values_y = {}
+    try:
+        with nodes_file.open('r') as f:
+            header = f.readline().strip().split(",")
+            for line in csv.reader(f, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL, skipinitialspace=True):
+                line_list = [c.strip() for c in line]  # Trim whitespace
+                if len(line_list) < len(header):
+                    continue  # Skip lines with insufficient data
+
+                osmid = int(line_list[header.index("osmid")])
+                values_x[osmid] = float(line_list[header.index("x")])
+                values_y[osmid] = float(line_list[header.index("y")])
+
+        # Set node attributes
         nx.set_node_attributes(G, values_x, "x")
         nx.set_node_attributes(G, values_y, "y")
 
+    except FileNotFoundError:
+        print(f"Error: The file {nodes_file} does not exist.")
+        return None  # Or handle as appropriate
+
+    # Clean up unzipped files if needed
     if compress:
-        os.remove(p + prefix + '_nodes.csv')
-        os.remove(p + prefix + '_edges.csv')
+        edges_file.unlink()  # Remove edges file
+        nodes_file.unlink()  # Remove nodes file
+
     return G
 
 
-def csv_to_ig(p, placeid, parameterid, cleanup = True):
+def csv_to_ig(p: Path, placeid: str, parameterid: str, cleanup: bool = True) -> ig.Graph:
     """ Load an ig graph from _edges.csv and _nodes.csv
     The edge file must have attributes u,v,osmid,length
     The node file must have attributes y,x,osmid
     Only these attributes are loaded.
     """
-    prefix = placeid + '_' + parameterid
+    prefix = f"{placeid}_{parameterid}"
     compress = check_extract_zip(p, prefix)
     empty = False
+
+    # Define paths for the nodes and edges CSV files
+    nodes_file = p / f"{prefix}_nodes.csv"
+    edges_file = p / f"{prefix}_edges.csv"
+    
     try:
-        n = pd.read_csv(p + prefix + '_nodes.csv')
-        e = pd.read_csv(p + prefix + '_edges.csv')
-    except:
+        n = pd.read_csv(nodes_file)
+        e = pd.read_csv(edges_file)
+    except FileNotFoundError:
         empty = True
-    if compress and cleanup and not SERVER: # do not clean up on the server as csv is needed in parallel jobs
-        os.remove(p + prefix + '_nodes.csv')
-        os.remove(p + prefix + '_edges.csv')
+
+    if compress and cleanup and not SERVER:  # do not clean up on the server as csv is needed in parallel jobs
+        nodes_file.unlink(missing_ok=True)  # Remove nodes file if it exists
+        edges_file.unlink(missing_ok=True)  # Remove edges file if it exists
+
     if empty:
-        return ig.Graph(directed = False)
+        return ig.Graph(directed=False)
+
     G = osm_to_ig(n, e)
     round_coordinates(G)
     mirror_y(G)
@@ -1300,7 +1376,7 @@ def generate_video(placeid, imgname, vformat = "webm", duplicatelastframe = 5, v
 
 
 
-def write_result(res, mode, placeid, poi_source, prune_measure, suffix, dictnested = {}):
+def write_result(res, mode, placeid, poi_source, prune_measure, suffix, dictnested={}):
     """Write results (pickle or dict to csv)
     """
     if mode == "pickle":
@@ -1308,23 +1384,31 @@ def write_result(res, mode, placeid, poi_source, prune_measure, suffix, dictnest
     else:
         openmode = "w"
 
+    # Construct the filename based on the provided parameters
     if poi_source:
-        filename = placeid + '_poi_' + poi_source + "_" + prune_measure + suffix
+        filename = f"{placeid}_poi_{poi_source}_{prune_measure}{suffix}"
     else:
-        filename = placeid + "_" + prune_measure + suffix
+        filename = f"{placeid}_{prune_measure}{suffix}"
 
-    with open(PATH["results"] + placeid + "/" + filename, openmode) as f:
+    # Use pathlib to construct the file path
+    result_path = Path(PATH["results"]) / placeid / filename
+
+    # Ensure the directory exists before writing
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Open the file for writing
+    with open(result_path, openmode) as f:
         if mode == "pickle":
             pickle.dump(res, f)
         elif mode == "dict":
             w = csv.writer(f)
             w.writerow(res.keys())
-            try: # dict with list values
+            try:  # dict with list values
                 w.writerows(zip(*res.values()))
-            except: # dict with single values
+            except:  # dict with single values
                 w.writerow(res.values())
         elif mode == "dictnested":
-            # https://stackoverflow.com/questions/29400631/python-writing-nested-dictionary-to-csv
+            # Writing a nested dictionary to CSV
             fields = ['network'] + list(dictnested.keys())
             w = csv.DictWriter(f, fields)
             w.writeheader()

@@ -7,15 +7,15 @@ for placeid, placeinfo in cities.items():
     print(placeid + ": Analyzing results")
 
     # Load networks
-    G_carall = csv_to_ig(PATH["data"] + placeid + "/", placeid, 'carall')
+    G_carall = csv_to_ig(PATH["data"] /  placeid , placeid, 'carall')
 
     # Load POIs
-    with open(PATH["data"] + placeid + "/" + placeid + '_poi_' + poi_source + '_nnidscarall.csv') as f:
+    with open(PATH["data"] /  placeid /  placeid + '_poi_' + poi_source + '_nnidscarall.csv') as f:
         nnids = [int(line.rstrip()) for line in f]
 
     # Load results
     filename = placeid + '_poi_' + poi_source + "_" + prune_measure
-    resultfile = open(PATH["results"] + placeid + "/" + filename + ".pickle",'rb')
+    resultfile = open(PATH["results"] /  placeid /  filename + ".pickle",'rb')
     res = pickle.load(resultfile)
     resultfile.close()
 
@@ -25,7 +25,7 @@ for placeid, placeinfo in cities.items():
 
     # Read old results
     filename = placeid + '_poi_' + poi_source + "_" + prune_measure + ".csv"
-    results_old = np.genfromtxt(PATH["results"] + placeid + "/" + filename, delimiter=',', names = True)
+    results_old = np.genfromtxt(PATH["results"] /  placeid /  filename, delimiter=',', names = True)
 
     # Stitch the results together
     output_final = {}
@@ -44,7 +44,7 @@ for placeid, placeinfo in cities.items():
     
     # Read old results
     filename = placeid + '_poi_' + poi_source + "_mst.csv"
-    results_MST_old = np.genfromtxt(PATH["results"] + placeid + "/" + filename, delimiter=',', names = True)
+    results_MST_old = np.genfromtxt(PATH["results"] /  placeid /  filename, delimiter=',', names = True)
 
     # Stitch the results together
     output_MST_final = {}

@@ -17,6 +17,7 @@ dependencies:
   - tqdm
   - geojson
   - pip
+  - pathlib
   - pip:
     # not available via conda-forge:
     - opencv-python
