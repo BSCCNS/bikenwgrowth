@@ -205,7 +205,7 @@ for placeid, placeinfo in tqdm(cities.items(), desc="Cities"):
             nnids.add(n)
     
     # Save the snapped nodes to a CSV
-    with (PATH["data"] / placeid / f"{placeid}_grid_nnidscarall.csv").open('w', newline='', encoding='utf-8') as f:
+    with (PATH["data"] / placeid / f"{placeid}_poi_grid_nnidscarall.csv").open('w', newline='', encoding='utf-8') as f:
         for item in nnids:
             f.write(f"{item}\n")
     

@@ -32,11 +32,13 @@ def extract_relevant_polygon(placeid, mp):
     """
     if isinstance(mp, shapely.geometry.polygon.Polygon):
         return mp
-    if placeid == "tokyo": # If Tokyo, take poly with most northern bound, otherwise largest
-        p = max(mp, key=lambda a: a.bounds[-1])
+    elif isinstance(mp, shapely.geometry.multipolygon.MultiPolygon):
+        if placeid == "tokyo":  # If Tokyo, take poly with most northern bound, otherwise largest
+            return max(mp.geoms, key=lambda a: a.bounds[-1])
+        else:
+            return max(mp.geoms, key=lambda a: a.area)
     else:
-        p = max(mp, key=lambda a: a.area)
-    return p
+        raise ValueError("Input 'mp' must be a Polygon or MultiPolygon object.")
 
 def get_holes(cov):
     """Get holes (= shapely interiors) from a coverage Polygon or MultiPolygon

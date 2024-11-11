@@ -168,6 +168,8 @@ for placeid, placeinfo in cities.items():
     timing_data.append([placeid, "Total Process Time", total_duration])
     
 with open(timing_file, mode='w', newline='') as file:
-writer = csv.writer(file)
-writer.writerow(["PlaceID", "Process", "Time (seconds)"])  # CSV header
-writer.writerows(timing_data)
+    writer = csv.writer(file)
+    writer.writerow(["PlaceID", "Process", "Time (seconds)"])  # CSV header
+    writer.writerows(timing_data)
+    
+print(f"Timing data saved to {timing_file}")
