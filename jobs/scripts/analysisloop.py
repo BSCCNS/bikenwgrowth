@@ -1,9 +1,19 @@
-debug = False
 
-exec(open("../../parameters/parameters.py").read())
-exec(open("../../scripts/path.py").read())
-exec(open("../../scripts/initialize.py").read())
-exec(open("../../scripts/functions.py").read())
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+print(sys.path)
+
+from parameters import parameters
+from scripts import path
+print("PATH:", path.PATH)
+from scripts.initialize import itertools
+
+#exec(open("../../parameters/parameters.py").read())
+#exec(open("../../scripts/path.py").read())
+#exec(open("../../scripts/initialize.py").read())
+#exec(open("../../scripts/functions.py").read())
 
 if __name__ == '__main__':
     if len(sys.argv) > 1: # limit to specific city

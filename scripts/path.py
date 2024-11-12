@@ -1,6 +1,6 @@
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[2]  # This goes up two levels to the project root
+BASE_DIR = Path(__file__).resolve().parents[1]  # This goes up two levels to the project root
 
 # Define paths dictionary relative to BASE_DIR
 PATH = {
@@ -16,5 +16,5 @@ PATH = {
     "logs": BASE_DIR / "bikenwgrowth_external" / "logs",
 }
 # Example usage of a path
-print("Current working directory:", Path.cwd())
-print("Loaded PATH:", PATH)
+#print("Current working directory:", Path.cwd())
+#print("Loaded PATH:", PATH)

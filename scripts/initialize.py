@@ -1,3 +1,8 @@
+#config
+from pathlib import Path
+from scripts.path import PATH
+debug = False
+
 # System
 import copy
 import csv
@@ -32,6 +37,7 @@ import matplotlib
 from matplotlib.collections import PatchCollection
 from matplotlib.ticker import MaxNLocator
 
+print("PATH:", PATH)
 # Geo
 import osmnx as ox
 ox.settings.log_file = True
@@ -53,6 +59,7 @@ import geojson
 # dict of placeid:placeinfo
 # If a city has a proper shapefile through nominatim
 # In case no (False), manual download of shapefile is necessary, see below
+
 cities = {}
 current_dir = os.getcwd()
 print("Current working directory:", current_dir)
