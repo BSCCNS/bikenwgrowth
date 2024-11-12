@@ -2,7 +2,7 @@ debug = False
 
 exec(open("../../parameters/parameters.py").read())
 exec(open("../../scripts/path.py").read())
-exec(open("../../scripts/setup.py").read())
+exec(open("../../scripts/initialize.py").read())
 exec(open("../../scripts/functions.py").read())
 
 if __name__ == '__main__':

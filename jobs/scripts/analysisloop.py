@@ -2,7 +2,7 @@ debug = False
 
 exec(open("../../parameters/parameters.py").read())
 exec(open("../../scripts/path.py").read())
-exec(open("../../scripts/setup.py").read())
+exec(open("../../scripts/initialize.py").read())
 exec(open("../../scripts/functions.py").read())
 
 if __name__ == '__main__':
@@ -38,4 +38,4 @@ if __name__ == '__main__':
         exec(open("../../scripts/04.py").read())
 
         print("Running 05.py")
-        #exec(open("../../scripts/05.py").read())
+        exec(open("../../scripts/05.py").read())
