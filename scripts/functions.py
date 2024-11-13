@@ -692,7 +692,7 @@ def mst_routing(G, pois):
     for e in G_temp.es: # delete all edges
         G_temp.es.delete(e)
         
-    poipairs = poipairs_by_distance(G, pois, True)
+    poipairs = poipairs_by_distance(G,G_carall, pois, True)
     if len(poipairs) == 0: return (ig.Graph(), ig.Graph())
 
     MST_abstract = copy.deepcopy(G_temp.subgraph(pois_indices))
@@ -763,7 +763,7 @@ def greedy_triangulation(GT, poipairs, prune_quantile = 1, prune_measure = "betw
     return GT
 
 
-def greedy_triangulation_routing(G, pois, prune_quantiles = [1], prune_measure = "betweenness"):
+def greedy_triangulation_routing(G, G_carall, pois, prune_quantiles = [1], prune_measure = "betweenness"):
     """Greedy Triangulation (GT) of a graph G's node subset pois,
     then routing to connect the GT (up to a quantile of betweenness
     betweenness_quantile).
@@ -788,7 +788,7 @@ def greedy_triangulation_routing(G, pois, prune_quantiles = [1], prune_measure =
     for e in G_temp.es: # delete all edges
         G_temp.es.delete(e)
         
-    poipairs = poipairs_by_distance(G, pois, True)
+    poipairs = poipairs_by_distance(G, G_carall, pois, True)
     if len(poipairs) == 0: return ([], [])
 
     if prune_measure == "random":
@@ -835,6 +835,12 @@ def poipairs_by_distance(G, G_carall, pois, return_distances = False):
     Returns all pairs of poi ids in ascending order of their distance. 
     If return_distances, then distances are also returned.
     """
+    
+    if not isinstance(pois, (list, set, tuple)):
+        print("Expected pois to be a list, set, or tuple of points of interest, but got:", type(pois),print(pois))
+        #raise ValueError("Expected pois to be a list, set, or tuple of points of interest, but got:", type(pois),print(pois))
+        return []
+    
     
     # Get poi indices
     indices = []
