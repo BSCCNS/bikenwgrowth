@@ -1,6 +1,7 @@
 from pathlib import Path
 from scripts import path
 from scripts.initialize import *
+from parameters.parameters import *
 # GRAPH PLOTTING
 
 def holepatchlist_from_cov(cov, map_center):
@@ -829,7 +830,7 @@ def greedy_triangulation_routing(G, pois, prune_quantiles = [1], prune_measure =
     return (GTs, GT_abstracts)
     
     
-def poipairs_by_distance(G, pois, return_distances = False):
+def poipairs_by_distance(G,G_carall pois, return_distances = False):
     """Calculates the (weighted) graph distances on G for a subset of nodes pois.
     Returns all pairs of poi ids in ascending order of their distance. 
     If return_distances, then distances are also returned.
