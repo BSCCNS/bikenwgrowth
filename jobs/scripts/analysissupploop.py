@@ -1,9 +1,16 @@
-debug = False
+import sys
+from pathlib import Path
 
-exec(open("../../parameters/parameters.py").read())
-exec(open("../../scripts/path.py").read())
-exec(open("../../scripts/initialize.py").read())
-exec(open("../../scripts/functions.py").read())
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
+#-------------------------------------------------------#
+from scripts import path
+from scripts.initialize import itertools, cities
+
+
+debug = False
+PATH = path.PATH
+from scripts import additional_calculations
 
 if __name__ == '__main__':
     if len(sys.argv) > 1: # limit to specific city
@@ -25,4 +32,4 @@ if __name__ == '__main__':
         print(poi_source, prune_measure)
 
         print("Running 09.py")
-        exec(open("09.py").read())
+        additional_calculations.main(PATH,cities)

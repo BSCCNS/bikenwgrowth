@@ -3,17 +3,15 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-print(sys.path)
 
-from parameters import parameters
+#------------------------------------------------#
 from scripts import path
-print("PATH:", path.PATH)
-from scripts.initialize import itertools
+from scripts.initialize import itertools, cities
 
-#exec(open("../../parameters/parameters.py").read())
-#exec(open("../../scripts/path.py").read())
-#exec(open("../../scripts/initialize.py").read())
-#exec(open("../../scripts/functions.py").read())
+debug = False
+PATH = path.PATH
+print(cities)
+from scripts import poi_based_generation, analyze_results, plot_results 
 
 if __name__ == '__main__':
     if len(sys.argv) > 1: # limit to specific city
@@ -36,16 +34,16 @@ if __name__ == '__main__':
     if len(sys.argv) > 2: # limit to specific parameter set
         parsets_used = [parsets[int(sys.argv[2])]]
     else:
-        parsets_used = parsets
+        parsets_used = parsets 
 
     for poi_source, prune_measure in parsets_used:
         print(poi_source, prune_measure)
 
         print("Running 03.py")
-        exec(open("../../scripts/03.py").read())
+        poi_based_generation.main(PATH, cities)
 
         print("Running 04.py")
-        exec(open("../../scripts/04.py").read())
+        analyze_results.main(PATH, cities)
 
         print("Running 05.py")
-        exec(open("../../scripts/05.py").read())
+        plot_results.main(PATH, cities)
