@@ -20,6 +20,7 @@ from tqdm.notebook import tqdm
 import warnings
 import shutil
 import time
+from tqdm import tqdm
 
 # Math/Data
 import math

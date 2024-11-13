@@ -670,7 +670,7 @@ def clusterpairs_by_distance(G, G_total, clusters, clusterinfo, return_distances
         return [[o[0], o[1]] for o in clusterpairs]
 
 
-def mst_routing(G, pois):
+def mst_routing(G, G_carall, pois):
     """Minimum Spanning Tree (MST) of a graph G's node subset pois,
     then routing to connect the MST.
     G is an ipgraph graph, pois is a list of node ids.
@@ -779,7 +779,6 @@ def greedy_triangulation_routing(G, G_carall, pois, prune_quantiles = [1], prune
     """
     
     if len(pois) < 2: return ([], []) # We can't do anything with less than 2 POIs
-
     # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
     pois_indices = set()
     for poi in pois:
@@ -837,9 +836,9 @@ def poipairs_by_distance(G, G_carall, pois, return_distances = False):
     """
     
     if not isinstance(pois, (list, set, tuple)):
-        print("Expected pois to be a list, set, or tuple of points of interest, but got:", type(pois),print(pois))
-        #raise ValueError("Expected pois to be a list, set, or tuple of points of interest, but got:", type(pois),print(pois))
-        return []
+        
+        raise ValueError("Expected pois to be a list, set, or tuple of points of interest, but got:", type(pois),print(pois))
+    
     
     
     # Get poi indices
