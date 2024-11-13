@@ -84,7 +84,7 @@ def hole_to_patch(hole, map_center):
     return matplotlib.patches.Polygon(pos_transformed)
 
 
-def set_analysissubplot(key):
+def set_analysissubplot(ax, key):
     ax.set_xlim(0, 1)
     ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1])
     if key in ["length", "length_lcc", "coverage", "poi_coverage", "components", "efficiency_local", "efficiency_global"]:
