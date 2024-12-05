@@ -1,6 +1,15 @@
-from scripts.initialize import *
-from scripts.functions import *
-from parameters.parameters import *
+#config
+from pathlib import Path
+debug = False
+
+# System
+import csv
+import time
+
+
+# Local
+from scripts.functions import csv_to_ig, write_result, mst_routing, greedy_triangulation_routing
+from parameters.parameters import poi_source, prune_measure, prune_quantiles
 
 def main(PATH, cities):
         

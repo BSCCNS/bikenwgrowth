@@ -1,6 +1,37 @@
-from scripts.initialize import *
-from scripts.functions import *
-from parameters.parameters import *
+#config
+from scripts.path import PATH
+debug = False
+
+# System
+import csv
+from tqdm.notebook import tqdm
+import time
+from tqdm import tqdm
+
+# Math/Data
+import math
+import numpy as np
+import pandas as pd
+
+# Plotting
+import matplotlib.pyplot as plt
+
+# Geo
+import osmnx as ox
+ox.settings.log_file = True
+ox.settings.requests_timeout = 300
+ox.settings.logs_folder = PATH["logs"]
+import fiona
+import shapely
+from haversine import haversine
+import pyproj
+from shapely.geometry import Polygon
+
+# Local
+from scripts.functions import fill_holes, extract_relevant_polygon, csv_to_ox, count_and_merge, rotate_grid, reverse_bearing
+from parameters.parameters import  gridl, bearingbins, poiparameters, osmnxparameters, snapthreshold
+
+
 
 def main(PATH, cities):
     # Load all carall graphs in OSMNX format

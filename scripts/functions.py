@@ -1,8 +1,43 @@
 from pathlib import Path
-from scripts import path
-from scripts.initialize import *
-from parameters.parameters import *
+from scripts.path import PATH
+#from scripts.initialize import *
+from parameters.parameters import  SERVER, plotparam
+
+# System
+import copy
+import csv
+import os
+import pickle
+import itertools
+import random
+import zipfile
+from tqdm import tqdm
+
+# Math/Data
+import math
+import numpy as np
+import pandas as pd
+
+# Network
+import igraph as ig
+import networkx as nx
+
 # GRAPH PLOTTING
+import matplotlib.pyplot as plt
+import matplotlib
+from matplotlib.collections import PatchCollection
+from matplotlib.ticker import MaxNLocator
+
+# Geo
+import osmnx as ox
+import shapely
+from haversine import haversine, haversine_vector
+import pyproj
+from shapely.geometry import Point, LineString, Polygon
+import shapely.ops as ops
+import geopandas as gpd
+import geojson
+
 
 def holepatchlist_from_cov(cov, map_center):
     """Get a patchlist of holes (= shapely interiors) from a coverage Polygon or MultiPolygon

@@ -4,7 +4,6 @@ from scripts.path import PATH
 debug = False
 
 # System
-import copy
 import csv
 import sys
 import os

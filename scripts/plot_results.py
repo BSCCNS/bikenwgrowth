@@ -1,6 +1,29 @@
-from scripts.initialize import *
-from scripts.functions import *
-from parameters.parameters import *
+#config
+from pathlib import Path
+from scripts.path import PATH
+debug = False
+
+# System
+import csv
+import os
+import pickle
+from tqdm.notebook import tqdm
+import warnings
+import time
+from tqdm import tqdm
+
+# Math/Data
+import numpy as np
+
+# Plotting
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
+# Local
+
+from scripts.functions import nxdraw, initplot,nodesize_from_pois, csv_to_ig, set_analysissubplot, cov_to_patchlist
+from parameters.parameters import poi_source, prune_measure, prune_measures, prune_quantiles, nodesize_grown, plotparam, plotparam_analysis, constricted_parameternamemap, constricted_plotinfo, analysis_existing_rowkeys
+
 
 def main(PATH, cities):    
     warnings.filterwarnings('ignore')
@@ -485,6 +508,7 @@ def main(PATH, cities):
                     tmp, = ax.plot(prune_quantiles, analysis_result[key+"_routed"], **plotparam_analysis["bikegrown"])
                     tmp.set_label('_hidden')
                 elif key in ["length", "length_lcc"]: # Convert m->km
+                    print(prune_quantiles,analysis_result[key]/1000)
                     ax.plot(prune_quantiles, analysis_result[key]/1000, **plotparam_analysis["bikegrown"])
                     xmin, xmax = ax.get_xlim()
                     ax.plot([xmin, xmax], [analysis_mst_result[key]/1000, analysis_mst_result[key]/1000], **plotparam_analysis["mst"])

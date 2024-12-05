@@ -1,8 +1,41 @@
-from scripts.initialize import *
-from scripts.functions import *
-from parameters.parameters import *
+
+#config
+from scripts.path import PATH
+debug = False
+
+# System
+import csv
+import os
+import time
+from tqdm import tqdm
+
+# Math/Data
+import numpy as np
+
+# Network
+import networkx as nx
+
+# Plotting
+import matplotlib.pyplot as plt
+from matplotlib import cm
+
+print("PATH:", PATH)
+# Geo
+import osmnx as ox
+ox.settings.log_file = True
+ox.settings.requests_timeout = 300
+ox.settings.logs_folder = PATH["logs"]
+import fiona
+import shapely
+
+# Local
+from scripts.functions import fill_holes, extract_relevant_polygon, ox_to_csv, compress_file
+from parameters.parameters import  networktypes, osmnxparameters
+
+
 
 def main(PATH, cities):
+    
     # Initialize a list to store timing information
     timing_data = []
 
