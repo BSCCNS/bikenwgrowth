@@ -11,7 +11,7 @@ from tqdm.notebook import tqdm
 import warnings
 import time
 from tqdm import tqdm
-
+from numpy.lib.recfunctions import unstructured_to_structured
 # Math/Data
 import numpy as np
 
@@ -493,11 +493,45 @@ def main(PATH, cities):
             nc = 5
             fig, axes = plt.subplots(nrows = 2, ncols = nc, figsize = (16, 6))
             # Bike network
-            keys_metrics = {"length": "Length [km]","coverage": "Coverage [km$^2$]","overlap_biketrack": "Overlap Protected","directness_all_linkwise": "Directness","efficiency_global": "Global Efficiency",
-                    "length_lcc": "Length of LCC [km]","poi_coverage": "POIs covered","overlap_bikeable": "Overlap Bikeable","components": "Components","efficiency_local": "Local Efficiency"}
-            
+            keys_metrics = {
+                "length": "Length [km]",
+                "coverage": "Coverage [km$^2$]",
+                "overlap_biketrack": "Overlap Protected",
+                "directness_all_linkwise": "Directness",
+                "efficiency_global": "Global Efficiency",
+                "length_lcc": "Length of LCC [km]",
+                "poi_coverage": "POIs covered",
+                "overlap_bikeable": "Overlap Bikeable",
+                "components": "Components",
+                "efficiency_local": "Local Efficiency"
+            }
+
             for i, ax in enumerate(axes[0]):
                 key = list(keys_metrics.keys())[i]
+                # Check length consistency
+                # Create a dictionary to store the adjusted data
+                analysis_dict = {name: analysis_result[name] for name in analysis_result.dtype.names}
+
+                # Adjust the dimensions of the key field
+                for name, data_column in analysis_dict.items():
+                    if len(data_column) > len(prune_quantiles):
+                        print(f"Truncating '{name}' from {len(data_column)} to {len(prune_quantiles)}.")
+                        analysis_dict[name] = data_column[:len(prune_quantiles)]
+                    elif len(data_column) < len(prune_quantiles):
+                        print(f"Padding '{name}' from {len(data_column)} to {len(prune_quantiles)}.")
+                        padding = [float('nan')] * (len(prune_quantiles) - len(data_column))
+                        analysis_dict[name] = np.concatenate([data_column, padding])
+
+                # Recreate the structured array with the adjusted data
+                new_data = np.zeros(len(prune_quantiles), dtype=analysis_result.dtype)
+
+                # Fill the new structured array
+                for name in new_data.dtype.names:
+                    new_data[name] = analysis_dict[name]
+
+                # Replace the original analysis_result with the adjusted array
+                analysis_result = new_data
+                
                 if key in ["overlap_biketrack", "overlap_bikeable"]:
                     ax.plot(prune_quantiles, analysis_result[key] / analysis_result["length"], **plotparam_analysis["bikegrown"])
                 elif key in ["efficiency_global", "efficiency_local"]:
@@ -507,32 +541,32 @@ def main(PATH, cities):
                     tmp.set_label('_hidden')
                     tmp, = ax.plot(prune_quantiles, analysis_result[key+"_routed"], **plotparam_analysis["bikegrown"])
                     tmp.set_label('_hidden')
-                elif key in ["length", "length_lcc"]: # Convert m->km
-                    print(prune_quantiles,analysis_result[key]/1000)
-                    ax.plot(prune_quantiles, analysis_result[key]/1000, **plotparam_analysis["bikegrown"])
+                elif key in ["length", "length_lcc"]:  # Convert m -> km
+                    ax.plot(prune_quantiles, analysis_result[key] / 1000, **plotparam_analysis["bikegrown"])
                     xmin, xmax = ax.get_xlim()
-                    ax.plot([xmin, xmax], [analysis_mst_result[key]/1000, analysis_mst_result[key]/1000], **plotparam_analysis["mst"])
+                    ax.plot([xmin, xmax], [analysis_mst_result[key] / 1000, analysis_mst_result[key] / 1000], **plotparam_analysis["mst"])
                 else:
                     ax.plot(prune_quantiles, analysis_result[key], **plotparam_analysis["bikegrown"])
                     xmin, xmax = ax.get_xlim()
                     ax.plot([xmin, xmax], [analysis_mst_result[key], analysis_mst_result[key]], **plotparam_analysis["mst"])
-                    
+
                 try:
-                    if key in ["length", "length_lcc"]: # Convert m->km
-                        tmp, = ax.plot([xmin, xmax], [analysis_existing[key][analysis_existing_rowkeys["biketrack"]]/1000, analysis_existing[key][analysis_existing_rowkeys["biketrack"]]/1000], **plotparam_analysis["biketrack"])
+                    # Add comparison with existing bike tracks or bikeable networks
+                    if key in ["length", "length_lcc"]:  # Convert m -> km
+                        tmp, = ax.plot([xmin, xmax], [analysis_existing[key][analysis_existing_rowkeys["biketrack"]] / 1000, analysis_existing[key][analysis_existing_rowkeys["biketrack"]] / 1000], **plotparam_analysis["biketrack"])
                     else:
                         tmp, = ax.plot([xmin, xmax], [analysis_existing[key][analysis_existing_rowkeys["biketrack"]], analysis_existing[key][analysis_existing_rowkeys["biketrack"]]], **plotparam_analysis["biketrack"])
                     if key in ["efficiency_global", "efficiency_local"]:
                         tmp.set_label('_hidden')
 
-                    if key in ["length", "length_lcc"]: # Convert m->km
-                        tmp, = ax.plot([xmin, xmax], [analysis_existing[key][analysis_existing_rowkeys["bikeable"]]/1000, analysis_existing[key][analysis_existing_rowkeys["bikeable"]]/1000], **plotparam_analysis["bikeable"])
+                    if key in ["length", "length_lcc"]:  # Convert m -> km
+                        tmp, = ax.plot([xmin, xmax], [analysis_existing[key][analysis_existing_rowkeys["bikeable"]] / 1000, analysis_existing[key][analysis_existing_rowkeys["bikeable"]] / 1000], **plotparam_analysis["bikeable"])
                     else:
                         tmp, = ax.plot([xmin, xmax], [analysis_existing[key][analysis_existing_rowkeys["bikeable"]], analysis_existing[key][analysis_existing_rowkeys["bikeable"]]], **plotparam_analysis["bikeable"])
                     if key in ["efficiency_global", "efficiency_local"]:
                         tmp.set_label('_hidden')
-                except:
-                    pass
+                except Exception as e:
+                    print(f"Error plotting '{key}': {e}")
 
                 if key == "efficiency_global" and plotconstricted:
                     ax.plot([0]+prune_quantiles_constricted, analysis_result_constricted[:, 0], **plotparam_analysis["constricted"])
