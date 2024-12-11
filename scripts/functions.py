@@ -150,9 +150,11 @@ def nodesize_from_pois(nnids):
 def simplify_ig(G):
     """Simplify an igraph with ox.simplify_graph
     """
-    G_temp = copy.deepcopy(G)
+    G_temp = G.copy()  # Avoid deep copy unless truly needed
     G_temp.es["length"] = G_temp.es["weight"]
-    output = ig.Graph.from_networkx(ox.simplify_graph(nx.MultiDiGraph(G_temp.to_networkx())).to_undirected())
+
+    simplified_graph = ox.simplify_graph(nx.MultiDiGraph(G_temp.to_networkx()))
+    output = ig.Graph.from_networkx(simplified_graph.to_undirected())
     output.es["weight"] = output.es["length"]
     return output
 
@@ -482,7 +484,6 @@ def ig_to_geojson(G):
 
 
 
-
 # NETWORK GENERATION
 
 def highest_closeness_node(G):
@@ -561,8 +562,6 @@ def constrict_overlaps(G_res, G_orig, factor = 5):
             pass
 
 
-
-    
 
 def greedy_triangulation_routing_clusters(G, G_total, clusters, clusterinfo, prune_quantiles = [1], prune_measure = "betweenness", verbose = False, full_run = False):
     """Greedy Triangulation (GT) of a bike network G's clusters,
@@ -1069,19 +1068,26 @@ def calculate_efficiency_global(G, numnodepairs = 500, normalized = True):
     """
 
     if G is None: return 0
-    if G.vcount() > numnodepairs:
-        nodeindices = random.sample(list(G.vs.indices), numnodepairs)
-    else:
-        nodeindices = list(G.vs.indices)
+
+    nodeindices = random.sample(G.vs.indices, numnodepairs) if G.vcount() > numnodepairs else list(G.vs.indices)
+
     d_ij = G.shortest_paths(source = nodeindices, target = nodeindices, weights = "weight")
-    d_ij = [item for sublist in d_ij for item in sublist] # flatten
+    d_ij = itertools.chain.from_iterable(d_ij) # flatten
+
     EG = sum([1/d for d in d_ij if d != 0])
-    if not normalized: return EG
+    if not normalized:
+         return EG
+
+
+    node_positions = {idx: (v["y"], v["x"]) for idx, v in enumerate(G.vs)}
     pairs = list(itertools.permutations(nodeindices, 2))
-    if len(pairs) < 1: return 0
-    l_ij = dist_vector([(G.vs[p[0]]["y"], G.vs[p[0]]["x"]) for p in pairs],
-                            [(G.vs[p[1]]["y"], G.vs[p[1]]["x"]) for p in pairs]) # must be in format lat,lon = y,x
-    EG_id = sum([1/l for l in l_ij if l != 0])
+
+    l_ij = [
+        haversine(node_positions[p[0]], node_positions[p[1]]) for p in pairs
+    ]
+
+    EG_id = sum(1 / l for l in l_ij if l != 0)
+
     # if (EG / EG_id) > 1: # This should not be allowed to happen!
     #     pp.pprint(d_ij)
     #     pp.pprint(l_ij)
@@ -1092,7 +1098,7 @@ def calculate_efficiency_global(G, numnodepairs = 500, normalized = True):
     #     print(EG, EG_id)
     #     sys.exit()
     # assert EG / EG_id <= 1, "Normalized EG > 1. This should not be possible."
-    return EG / EG_id
+    return EG / EG_id if EG_id > 0 else 0
 
 
 def calculate_efficiency_local(G, numnodepairs = 500, normalized = True):
@@ -1107,8 +1113,7 @@ def calculate_efficiency_local(G, numnodepairs = 500, normalized = True):
     else:
         nodeindices = list(G.vs.indices)
     EGi = []
-    vcounts = []
-    ecounts = []
+
     for i in nodeindices:
         if len(G.neighbors(i)) > 1: # If we have a nontrivial neighborhood
             G_induced = G.induced_subgraph(G.neighbors(i))
@@ -1145,6 +1150,7 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
         cl = G.clusters()
         LCC = cl.giant()
 
+
         # EFFICIENCY
         if not ignore_GT_abstract:
             if verbose and ("efficiency_global" in calcmetrics or "efficiency_local" in calcmetrics): print("Calculating efficiency...")
@@ -1157,13 +1163,22 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
         if verbose and ("efficiency_global_routed" in calcmetrics or "efficiency_local_routed" in calcmetrics): print("Calculating efficiency (routed)...")
         if "efficiency_global_routed" in calcmetrics:
             try:
-                output["efficiency_global_routed"] = calculate_efficiency_global(simplify_ig(G), numnodepairs)
+                
+                simplified_G = simplify_ig(G)
+
+            except:
+                print("Problem with simplify_ig, not supported between instances of 'int' and 'list'") # This try is needed for some pathological cases, for example loops generating empty graphs (only happened in Zurich, railwaystation/closeness)
+                pass
+
+            try:
+                output["efficiency_global_routed"] = calculate_efficiency_global(simplified_G, numnodepairs)
             except:
                 print("Problem with efficiency_global_routed.") # This try is needed for some pathological cases, for example loops generating empty graphs (only happened in Zurich, railwaystation/closeness)
                 pass
+
         if "efficiency_local_routed" in calcmetrics:
             try:
-                output["efficiency_local_routed"] = calculate_efficiency_local(simplify_ig(G), numnodepairs)
+                output["efficiency_local_routed"] = calculate_efficiency_local(simplified_G, numnodepairs)
             except:
                 print("Problem with efficiency_local_routed.") # This try is needed for some pathological cases, for example loops generating empty graphs (only happened in Zurich, railwaystation/closeness)
                 pass
@@ -1171,12 +1186,14 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
         # LENGTH
         if verbose and ("length" in calcmetrics or "length_lcc" in calcmetrics): print("Calculating length...")
         if "length" in calcmetrics:
-            output["length"] = sum([e['weight'] for e in G.es])
+            weights = [e['weight'] for e in G.es]
+            output["length"] = sum(weights)
         if "length_lcc" in calcmetrics:
             if len(cl) > 1:
-                output["length_lcc"] = sum([e['weight'] for e in LCC.es])
+                lcc_weights = [e['weight'] for e in LCC.es]
+                output["length_lcc"] = sum(lcc_weights)
             else:
-                output["length_lcc"] = output["length"]
+                output["length_lcc"] = sum(weights)
         
         # COVERAGE
         if "coverage" in calcmetrics:
@@ -1332,6 +1349,7 @@ def calculate_metrics_additively(Gs, GT_abstracts, prune_quantiles, G_big, nnids
         
         for key in output.keys():
             output[key].append(metrics[key])
+            
         covs[prune_quantile] = cov
         cov_prev = copy.deepcopy(cov)
         GT_prev = copy.deepcopy(GT)
