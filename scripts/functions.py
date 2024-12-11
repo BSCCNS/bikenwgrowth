@@ -1107,19 +1107,19 @@ def calculate_efficiency_local(G, numnodepairs = 500, normalized = True):
     random sample of numnodepairs nodes.
     """
 
-    if G is None: return 0
-    if G.vcount() > numnodepairs:
-        nodeindices = random.sample(list(G.vs.indices), numnodepairs)
-    else:
-        nodeindices = list(G.vs.indices)
-    EGi = []
+    if G is None: 
+        return 0
+    
+    nodeindices = random.sample(G.vs.indices, numnodepairs) if G.vcount() > numnodepairs else list(G.vs.indices)
 
-    for i in nodeindices:
-        if len(G.neighbors(i)) > 1: # If we have a nontrivial neighborhood
-            G_induced = G.induced_subgraph(G.neighbors(i))
-            EGi.append(calculate_efficiency_global(G_induced, numnodepairs, normalized))
-    return listmean(EGi)
-
+    EGi = [
+        calculate_efficiency_global(
+            G.induced_subgraph(G.neighbors(i)), numnodepairs, normalized
+        )
+        for i in nodeindices
+        if len(G.neighbors(i)) > 1
+    ]
+    return listmean(EGi) if EGi else 0
 
 def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
           "length_lcc":0,
