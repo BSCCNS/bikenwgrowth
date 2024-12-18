@@ -148,12 +148,19 @@ def nodesize_from_pois(nnids):
 
 
 def simplify_ig(G):
-    """Simplify an igraph with ox.simplify_graph
-    """
+    """Simplify an igraph with ox.simplify_graph."""
     G_temp = G.copy()  # Avoid deep copy unless truly needed
     G_temp.es["length"] = G_temp.es["weight"]
 
     simplified_graph = ox.simplify_graph(nx.MultiDiGraph(G_temp.to_networkx()))
+    
+    # Ensure edge attributes are scalars
+    for u, v, data in simplified_graph.edges(data=True):
+        for key, value in data.items():
+            if isinstance(value, list):
+                data[key] = sum(value)  # Example: aggregate list into a scalar
+
+    # Convert to igraph
     output = ig.Graph.from_networkx(simplified_graph.to_undirected())
     output.es["weight"] = output.es["length"]
     return output
@@ -1009,8 +1016,10 @@ def calculate_coverage_edges(G, buffer_m = 500, return_cov = False, G_prev = ig.
     delete_overlaps(G_added, G_prev)
 
     # https://gis.stackexchange.com/questions/121256/creating-a-circle-with-radius-in-metres
-    loncenter = listmean([v["x"] for v in G.vs])
-    latcenter = listmean([v["y"] for v in G.vs])
+    lon_coords = np.array(G.vs['x'])
+    lat_coords = np.array(G.vs['y'])
+    loncenter = np.mean(lon_coords)
+    latcenter = np.mean(lat_coords)
     local_azimuthal_projection = "+proj=aeqd +R=6371000 +units=m +lat_0={} +lon_0={}".format(latcenter, loncenter)
     # Use transformer: https://gis.stackexchange.com/questions/127427/transforming-shapely-polygon-and-multipolygon-objects
     wgs84_to_aeqd = pyproj.Transformer.from_proj(
@@ -1184,16 +1193,20 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
                 pass
 
         # LENGTH
-        if verbose and ("length" in calcmetrics or "length_lcc" in calcmetrics): print("Calculating length...")
+        if verbose and ("length" in calcmetrics or "length_lcc" in calcmetrics): 
+            print("Calculating length...")
+
         if "length" in calcmetrics:
-            weights = [e['weight'] for e in G.es]
-            output["length"] = sum(weights)
+
+            weights = np.array(G.es["weight"])
+            output["length"] = np.sum(weights)
+
         if "length_lcc" in calcmetrics:
             if len(cl) > 1:
-                lcc_weights = [e['weight'] for e in LCC.es]
-                output["length_lcc"] = sum(lcc_weights)
+                lcc_weights = np.array(LCC.es["weight"])
+                output["length_lcc"] = np.sum(lcc_weights)
             else:
-                output["length_lcc"] = sum(weights)
+                output["length_lcc"] = np.sum(weights)
         
         # COVERAGE
         if "coverage" in calcmetrics:
