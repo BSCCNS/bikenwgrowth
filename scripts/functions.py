@@ -158,7 +158,7 @@ def simplify_ig(G):
     for u, v, data in simplified_graph.edges(data=True):
         for key, value in data.items():
             if isinstance(value, list):
-                data[key] = sum(value)  # Example: aggregate list into a scalar
+                data[key] = np.sum(value)  # Example: aggregate list into a scalar
 
     # Convert to igraph
     output = ig.Graph.from_networkx(simplified_graph.to_undirected())
@@ -956,51 +956,78 @@ def count_and_merge(n, bearings):
     return count[::2] + count[1::2]
 
 
-def calculate_directness(G, numnodepairs = 500):
-    """Calculate directness on G over all connected node pairs in indices. This calculation method divides the total sum of euclidian distances by total sum of network distances.
+def calculate_directness(G, numnodepairs=500):
+    """Calculate directness on G over all connected node pairs in indices.
+    This calculation method divides the total sum of Euclidean distances by total sum of network distances.
     """
     
-    indices = random.sample(list(G.vs), min(numnodepairs, len(G.vs)))
+    indices = random.sample(range(len(G.vs)), min(numnodepairs, len(G.vs)))
 
-    poi_edges = []
     total_distance_direct = 0
-    for c, v in enumerate(indices):
-        poi_edges.append(G.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath"))
-        temp = G.get_shortest_paths(v, indices[c:], weights = "weight", output = "vpath")
-        try:
-            total_distance_direct += sum(dist_vector([(G.vs[t[0]]["y"], G.vs[t[0]]["x"]) for t in temp], [(G.vs[t[-1]]["y"], G.vs[t[-1]]["x"]) for t in temp])) # must be in format lat,lon = y, x
-        except: # Rarely, routing does not work. Unclear why.
-            pass
     total_distance_network = 0
-    for paths_e in poi_edges:
-        for path_e in paths_e:
-            # Sum up distances of path segments from first to last node
-            total_distance_network += sum([G.es[e]['weight'] for e in path_e])
-    
-    return total_distance_direct / total_distance_network
 
-def calculate_directness_linkwise(G, numnodepairs = 500):
-    """Calculate directness on G over all connected node pairs in indices. This is maybe the common calculation method: It takes the average of linkwise euclidian distances divided by network distances.
-
-        If G has multiple components, node pairs in different components are discarded.
-    """
-
-    indices = random.sample(list(G.vs), min(numnodepairs, len(G.vs)))
-
-    directness_links = np.zeros(int((len(indices)*(len(indices)-1))/2))
-    ind = 0
     for c, v in enumerate(indices):
-        poi_edges = G.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath")
-        for c_delta, path_e in enumerate(poi_edges[1:]): # Discard first empty list because it is the node to itself
-            if path_e: # if path is non-empty, meaning the node pair is in the same component
-                distance_network = sum([G.es[e]['weight'] for e in path_e]) # sum over all edges of path
-                distance_direct = dist(v, indices[c+c_delta+1]) # dist first to last node, must be in format lat,lon = y, x
+        # Get shortest paths from node v to other nodes in the indices
+        temp_paths = G.get_shortest_paths(v, indices[c:], weights="weight", output="vpath")
+        temp_edges = G.get_shortest_paths(v, indices[c:], weights="weight", output="epath")
+        
+        for path, edges in zip(temp_paths, temp_edges):
+            if len(path) > 1:  # Ensure there are at least two nodes in the path
+                # Ensure coords is 2D: (n, 2), where each row is (y, x)
+                coords = np.array([(G.vs[t]["y"], G.vs[t]["x"]) for t in path])
 
+                # Calculate Euclidean distances for each consecutive pair of coordinates
+                direct_dist = np.sum(np.linalg.norm(coords[1:] - coords[:-1], axis=1))  
+                total_distance_direct += direct_dist
+            
+                # Calculate network distance (sum of edge weights)
+                network_dist = np.sum([G.es[e]['weight'] for e in edges])
+                total_distance_network += network_dist
+
+    return total_distance_direct / total_distance_network if total_distance_network != 0 else 0
+
+
+def calculate_directness_linkwise(G, numnodepairs=500):
+    """Calculate directness on G over all connected node pairs in indices.
+    This is the common calculation method: It takes the average of linkwise Euclidean distances divided by network distances.
+    
+    If G has multiple components, node pairs in different components are discarded.
+    """
+    
+    # Select random node indices, ensure no index exceeds the total number of vertices
+    indices = random.sample(range(len(G.vs)), min(numnodepairs, len(G.vs)))
+
+    # Initialize arrays for storing the results
+    directness_links = np.zeros(int((len(indices) * (len(indices) - 1)) / 2))
+    ind = 0
+
+    # Precompute coordinates and edge weights to avoid repeated lookups
+    coords = np.array([(G.vs[t]["y"], G.vs[t]["x"]) for t in range(len(G.vs))])
+    
+    # Function to calculate Euclidean distance between two points
+    def euclidean_distance(i, j):
+        return np.linalg.norm(coords[i] - coords[j])
+
+    for c, v in enumerate(indices):
+        poi_edges = G.get_shortest_paths(v, indices[c:], weights="weight", output="epath")
+        
+        for c_delta, path_e in enumerate(poi_edges[1:]):  # Discard first empty list (node to itself)
+            if path_e:  # If path is non-empty, meaning the node pair is in the same component
+                # Calculate network distance (sum of edge weights)
+                distance_network = sum([G.es[e]['weight'] for e in path_e])
+                
+                # Calculate Euclidean distance between nodes
+                distance_direct = euclidean_distance(v, indices[c + c_delta + 1])
+
+                # Store the link-wise directness
                 directness_links[ind] = distance_direct / distance_network
                 ind += 1
-    directness_links = directness_links[:ind] # discard disconnected node pairs
+    
+    # Truncate the array to the actual size (discard disconnected node pairs)
+    directness_links = directness_links[:ind]
 
-    return np.mean(directness_links)
+    # Return the mean of the link-wise directness
+    return np.mean(directness_links) if ind > 0 else 0
 
 
 def listmean(lst): 
@@ -1211,21 +1238,26 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
         # COVERAGE
         if "coverage" in calcmetrics:
             if verbose: print("Calculating coverage...")
-            # G_added = G.difference(G_prev) # This doesnt work
+            
+            # Calculate coverage and overlap with existing networks
             covered_area, cov = calculate_coverage_edges(G, buffer_walk, return_cov, G_prev, cov_prev)
             output["coverage"] = covered_area
-            # OVERLAP WITH EXISTING NETS
+
+            # Check for existing infrastructure and calculate overlaps
             if Gexisting:
-                if "overlap_biketrack" in calcmetrics:
-                    try:
-                        output["overlap_biketrack"] = edge_lengths(intersect_igraphs(Gexisting["biketrack"], G))
-                    except: # If there is not bike infrastructure, set to zero
-                        output["overlap_biketrack"] = 0
-                if "overlap_bikeable" in calcmetrics:
-                    try:
-                        output["overlap_bikeable"] = edge_lengths(intersect_igraphs(Gexisting["bikeable"], G))
-                    except: # If there is not bikeable infrastructure, set to zero
-                        output["overlap_bikeable"] = 0
+                # Precompute the infrastructure types to check for overlap
+                overlap_metrics = {
+                    "overlap_biketrack": Gexisting.get("biketrack"),
+                    "overlap_bikeable": Gexisting.get("bikeable")
+                }
+                
+                # Iterate through overlap metrics to calculate overlap
+                for key, graph in overlap_metrics.items():
+                    if key in calcmetrics:
+                        if graph:  # Check if the infrastructure exists
+                            output[key] = edge_lengths(intersect_igraphs(graph, G))
+                        else:
+                            output[key] = 0  # If the infrastructure doesn't exist, set overlap to 0
 
         # POI COVERAGE
         if "poi_coverage" in calcmetrics:
@@ -1235,7 +1267,7 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
         # COMPONENTS
         if "components" in calcmetrics:
             if verbose: print("Calculating components...")
-            output["components"] = len(list(G.components()))
+            output["components"] = sum(1 for _ in G.components())
         
         # DIRECTNESS
         if verbose and ("directness" in calcmetrics or "directness_lcc" in calcmetrics): print("Calculating directness...")
