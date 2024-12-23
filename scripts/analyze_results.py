@@ -4,7 +4,7 @@
 #config
 from pathlib import Path
 from scripts.path import PATH
-debug = False
+debug = True
 
 # System
 import csv
@@ -20,7 +20,7 @@ import igraph as ig
 from shapely.geometry import Polygon
 
 # Local
-from scripts.functions import csv_to_ig, calculate_metrics, delete_overlaps, intersect_igraphs, calculate_metrics_additively, write_result
+from scripts.functions import csv_to_ig, calculate_metrics_parallel, delete_overlaps, intersect_igraphs, calculate_metrics_additively, write_result
 from parameters.parameters import poi_source, prune_measure, networktypes, buffer_walk, numnodepairs
 
 
@@ -97,7 +97,7 @@ def main(PATH, cities):
             covs = {}
             for networktype in tqdm(networktypes, desc="Networks", leave=False):
                 if debug: print(placeid + ": Analyzing results: " + networktype)
-                metrics, cov = calculate_metrics(Gs[networktype], Gs[networktype + "_simplified"], Gs['carall'], nnids, empty_metrics, buffer_walk, numnodepairs, debug)
+                metrics, cov = calculate_metrics_parallel(Gs[networktype], Gs[networktype + "_simplified"], Gs['carall'], nnids, empty_metrics, buffer_walk, numnodepairs, debug)
                 for key, val in metrics.items():
                     output_place[networktype][key] = val
                 covs[networktype] = cov
@@ -161,7 +161,7 @@ def main(PATH, cities):
             res["GTs"], res["GT_abstracts"], res["prune_quantiles"], G_carall, nnids,
             buffer_walk, numnodepairs, debug, True, Gexisting
         )
-        output_MST, cov_MST = calculate_metrics(
+        output_MST, cov_MST = calculate_metrics_parallel(
             res["MST"], res["MST_abstract"], G_carall, nnids, output,
             buffer_walk, numnodepairs, debug, True, ig.Graph(), Polygon(), False, Gexisting
         )

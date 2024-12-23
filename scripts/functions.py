@@ -12,6 +12,7 @@ import itertools
 import random
 import zipfile
 from tqdm import tqdm
+import concurrent.futures
 
 # Math/Data
 import math
@@ -1157,147 +1158,116 @@ def calculate_efficiency_local(G, numnodepairs = 500, normalized = True):
     ]
     return listmean(EGi) if EGi else 0
 
-def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
-          "length_lcc":0,
-          "coverage": 0,
-          "directness": 0,
-          "directness_lcc": 0,
-          "poi_coverage": 0,
-          "components": 0,
-          "overlap_biketrack": 0,
-          "overlap_bikeable": 0,
-          "efficiency_global": 0,
-          "efficiency_local": 0,
-          "directness_lcc_linkwise": 0,
-          "directness_all_linkwise": 0
-         }, buffer_walk = 500, numnodepairs = 500, verbose = False, return_cov = True, G_prev = ig.Graph(), cov_prev = Polygon(), ignore_GT_abstract = False, Gexisting = {}):
-    """Calculates all metrics (using the keys from calcmetrics).
-    """
+def calculate_metric(metric, G, GT_abstract, G_big, nnids, cl, G_prev, cov_prev, buffer_walk, numnodepairs, verbose, return_cov, Gexisting, output):
+    """Calculate the requested metric and store the result in the output dictionary."""
+    
+    if metric == "efficiency_global" and not ignore_GT_abstract:
+        if verbose: print("Calculating efficiency_global...")
+        output["efficiency_global"] = calculate_efficiency_global(GT_abstract, numnodepairs)
+
+    elif metric == "efficiency_local" and not ignore_GT_abstract:
+        if verbose: print("Calculating efficiency_local...")
+        output["efficiency_local"] = calculate_efficiency_local(GT_abstract, numnodepairs)
+        
+    elif metric == "efficiency_global_routed":
+        try:
+            simplified_G = simplify_ig(G)
+            output["efficiency_global_routed"] = calculate_efficiency_global(simplified_G, numnodepairs)
+        except Exception as e:
+            print(f"Error calculating efficiency_global_routed: {e}")
+
+    elif metric == "efficiency_local_routed":
+        try:
+            output["efficiency_local_routed"] = calculate_efficiency_local(simplified_G, numnodepairs)
+        except Exception as e:
+            print(f"Error calculating efficiency_local_routed: {e}")
+
+    elif metric == "length":
+        if verbose: print("Calculating length...")
+        weights = np.array(G.es["weight"])
+        output["length"] = np.sum(weights)
+
+    elif metric == "length_lcc":
+        if len(cl) > 1:
+            lcc_weights = np.array(cl.giant().es["weight"])
+            output["length_lcc"] = np.sum(lcc_weights)
+        else:
+            output["length_lcc"] = np.sum(np.array(G.es["weight"]))
+
+    elif metric == "coverage":
+        if verbose: print("Calculating coverage...")
+        covered_area, cov = calculate_coverage_edges(G, buffer_walk, return_cov, G_prev, cov_prev)
+        output["coverage"] = covered_area
+
+        if Gexisting:
+            overlap_metrics = {
+                "overlap_biketrack": Gexisting.get("biketrack"),
+                "overlap_bikeable": Gexisting.get("bikeable")
+            }
+            for key, graph in overlap_metrics.items():
+                if key in calcmetrics:
+                    if graph:
+                        output[key] = edge_lengths(intersect_igraphs(graph, G))
+                    else:
+                        output[key] = 0
+
+    elif metric == "poi_coverage":
+        if verbose: print("Calculating POI coverage...")
+        output["poi_coverage"] = calculate_poiscovered(G_big, cov, nnids)
+
+    elif metric == "components":
+        if verbose: print("Calculating components...")
+        output["components"] = sum(1 for _ in G.components())
+
+    elif metric == "directness":
+        if verbose: print("Calculating directness...")
+        output["directness"] = calculate_directness(G, numnodepairs)
+
+    elif metric == "directness_lcc":
+        if len(cl) > 1:
+            output["directness_lcc"] = calculate_directness(cl.giant(), numnodepairs)
+        else:
+            output["directness_lcc"] = output["directness"]
+
+    elif metric == "directness_lcc_linkwise":
+        if verbose: print("Calculating directness linkwise...")
+        if len(cl) > 1:
+            output["directness_lcc_linkwise"] = calculate_directness_linkwise(cl.giant(), numnodepairs)
+        else:
+            output["directness_lcc_linkwise"] = calculate_directness_linkwise(G, numnodepairs)
+
+    elif metric == "directness_all_linkwise":
+        if verbose: print("Calculating directness linkwise (all components)...")
+        if "directness_lcc_linkwise" in output and len(cl) <= 1:
+            output["directness_all_linkwise"] = output["directness_lcc_linkwise"]
+        else:
+            output["directness_all_linkwise"] = calculate_directness_linkwise(G, numnodepairs)
+
+def calculate_metrics_parallel(G, GT_abstract, G_big, nnids, calcmetrics = {"length": 0, "length_lcc": 0, "coverage": 0, "directness": 0}, buffer_walk = 500, numnodepairs = 500, verbose = False, return_cov = True, G_prev = ig.Graph(), cov_prev = Polygon(), ignore_GT_abstract = False, Gexisting = {}):
+    """Calculates all metrics (using the keys from calcmetrics) in parallel."""
     
     output = {}
     for key in calcmetrics:
         output[key] = 0
     cov = Polygon()
 
-    # Check that the graph has links (sometimes we have an isolated node)
-    if G.ecount() > 0 and GT_abstract.ecount() > 0:
-
-        # Get LCC
-        cl = G.clusters()
-        LCC = cl.giant()
-
-
-        # EFFICIENCY
-        if not ignore_GT_abstract:
-            if verbose and ("efficiency_global" in calcmetrics or "efficiency_local" in calcmetrics): print("Calculating efficiency...")
-            if "efficiency_global" in calcmetrics:
-                output["efficiency_global"] = calculate_efficiency_global(GT_abstract, numnodepairs)
-            if "efficiency_local" in calcmetrics:
-                output["efficiency_local"] = calculate_efficiency_local(GT_abstract, numnodepairs) 
+    # Get LCC
+    cl = G.clusters()
+    
+    # Use ProcessPoolExecutor to parallelize metric calculations
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = []
         
-        # EFFICIENCY ROUTED
-        if verbose and ("efficiency_global_routed" in calcmetrics or "efficiency_local_routed" in calcmetrics): print("Calculating efficiency (routed)...")
-        if "efficiency_global_routed" in calcmetrics:
-            try:
-                
-                simplified_G = simplify_ig(G)
-
-            except:
-                print("Problem with simplify_ig, not supported between instances of 'int' and 'list'") # This try is needed for some pathological cases, for example loops generating empty graphs (only happened in Zurich, railwaystation/closeness)
-                pass
-
-            try:
-                output["efficiency_global_routed"] = calculate_efficiency_global(simplified_G, numnodepairs)
-            except:
-                print("Problem with efficiency_global_routed.") # This try is needed for some pathological cases, for example loops generating empty graphs (only happened in Zurich, railwaystation/closeness)
-                pass
-
-        if "efficiency_local_routed" in calcmetrics:
-            try:
-                output["efficiency_local_routed"] = calculate_efficiency_local(simplified_G, numnodepairs)
-            except:
-                print("Problem with efficiency_local_routed.") # This try is needed for some pathological cases, for example loops generating empty graphs (only happened in Zurich, railwaystation/closeness)
-                pass
-
-        # LENGTH
-        if verbose and ("length" in calcmetrics or "length_lcc" in calcmetrics): 
-            print("Calculating length...")
-
-        if "length" in calcmetrics:
-
-            weights = np.array(G.es["weight"])
-            output["length"] = np.sum(weights)
-
-        if "length_lcc" in calcmetrics:
-            if len(cl) > 1:
-                lcc_weights = np.array(LCC.es["weight"])
-                output["length_lcc"] = np.sum(lcc_weights)
-            else:
-                output["length_lcc"] = np.sum(weights)
+        for metric in calcmetrics:
+            futures.append(executor.submit(calculate_metric, metric, G, GT_abstract, G_big, nnids, cl, G_prev, cov_prev, buffer_walk, numnodepairs, verbose, return_cov, Gexisting, output))
         
-        # COVERAGE
-        if "coverage" in calcmetrics:
-            if verbose: print("Calculating coverage...")
-            
-            # Calculate coverage and overlap with existing networks
-            covered_area, cov = calculate_coverage_edges(G, buffer_walk, return_cov, G_prev, cov_prev)
-            output["coverage"] = covered_area
-
-            # Check for existing infrastructure and calculate overlaps
-            if Gexisting:
-                # Precompute the infrastructure types to check for overlap
-                overlap_metrics = {
-                    "overlap_biketrack": Gexisting.get("biketrack"),
-                    "overlap_bikeable": Gexisting.get("bikeable")
-                }
-                
-                # Iterate through overlap metrics to calculate overlap
-                for key, graph in overlap_metrics.items():
-                    if key in calcmetrics:
-                        if graph:  # Check if the infrastructure exists
-                            output[key] = edge_lengths(intersect_igraphs(graph, G))
-                        else:
-                            output[key] = 0  # If the infrastructure doesn't exist, set overlap to 0
-
-        # POI COVERAGE
-        if "poi_coverage" in calcmetrics:
-            if verbose: print("Calculating POI coverage...")
-            output["poi_coverage"] = calculate_poiscovered(G_big, cov, nnids)
-
-        # COMPONENTS
-        if "components" in calcmetrics:
-            if verbose: print("Calculating components...")
-            output["components"] = sum(1 for _ in G.components())
-        
-        # DIRECTNESS
-        if verbose and ("directness" in calcmetrics or "directness_lcc" in calcmetrics): print("Calculating directness...")
-        if "directness" in calcmetrics:
-            output["directness"] = calculate_directness(G, numnodepairs)
-        if "directness_lcc" in calcmetrics:
-            if len(cl) > 1:
-                output["directness_lcc"] = calculate_directness(LCC, numnodepairs)
-            else:
-                output["directness_lcc"] = output["directness"]
-
-        # DIRECTNESS LINKWISE
-        if verbose and ("directness_lcc_linkwise" in calcmetrics): print("Calculating directness linkwise...")
-        if "directness_lcc_linkwise" in calcmetrics:
-            if len(cl) > 1:
-                output["directness_lcc_linkwise"] = calculate_directness_linkwise(LCC, numnodepairs)
-            else:
-                output["directness_lcc_linkwise"] = calculate_directness_linkwise(G, numnodepairs)
-        if verbose and ("directness_all_linkwise" in calcmetrics): print("Calculating directness linkwise (all components)...")
-        if "directness_all_linkwise" in calcmetrics:
-            if "directness_lcc_linkwise" in calcmetrics and len(cl) <= 1:
-                output["directness_all_linkwise"] = output["directness_lcc_linkwise"]
-            else: # we have >1 components
-                output["directness_all_linkwise"] = calculate_directness_linkwise(G, numnodepairs) # number of components is checked within calculate_directness_linkwise()
+        # Wait for all tasks to complete
+        concurrent.futures.wait(futures)
 
     if return_cov: 
-        return (output, cov)
+        return output, cov
     else:
         return output
-
 
 def overlap_linepoly(l, p):
     """Calculates the length of shapely LineString l falling inside the shapely Polygon p
@@ -1390,7 +1360,7 @@ def calculate_metrics_additively(Gs, GT_abstracts, prune_quantiles, G_big, nnids
     GT_prev = ig.Graph()
     for GT, GT_abstract, prune_quantile in zip(Gs, GT_abstracts, tqdm(prune_quantiles, desc = "Bicycle networks", leave = False)):
         if verbose: print("Calculating bike network metrics for quantile " + str(prune_quantile))
-        metrics, cov = calculate_metrics(GT, GT_abstract, G_big, nnids, output, buffer_walk, numnodepairs, verbose, return_cov, GT_prev, cov_prev, False, Gexisting)
+        metrics, cov = calculate_metrics_parallel(GT, GT_abstract, G_big, nnids, output, buffer_walk, numnodepairs, verbose, return_cov, GT_prev, cov_prev, False, Gexisting)
         
         for key in output.keys():
             output[key].append(metrics[key])
