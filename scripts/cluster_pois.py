@@ -35,9 +35,8 @@ from shapely.geometry import Polygon
 from tobler.util import h3fy
 
 # Local
-from scripts.functions import fill_holes, extract_relevant_polygon, csv_to_ox, count_and_merge, rotate_grid, reverse_bearing
-from parameters.parameters import  gridl, bearingbins, poiparameters, osmnxparameters, snapthreshold, h3_zoom, sanidad, educacion, administracion, aprovisionamiento, cultura, deporte, transporte, sanidad_slider, educacion_slider, administracion_slider, aprovisionamiento_slider, cultura_slider, deporte_slider, transporte_slider, snapthreshold
-from scripts.initialize import cities
+from scripts.functions import fill_holes, extract_relevant_polygon, csv_to_ox, convert_to_h3
+from parameters.parameters import sanidad, educacion, administracion, aprovisionamiento, cultura, deporte, transporte
 
 
 
@@ -144,26 +143,8 @@ def main(
                     print(f"Error processing geometry for {placeid}: {e}")
                     continue  # Skip to the next city if there is an error
 
-        ######### to funtion
-        # Ensure `location` is a GeoDataFrame
-        gdf = gpd.GeoDataFrame(geometry=[location], crs="EPSG:4326")
 
-        # Define the H3 resolution
-        zoom = h3_zoom
-
-        # Convert the original geometries to H3 hexagons (assuming h3fy is defined)
-        gdf_hex = h3fy(gdf, resolution=zoom)
-
-        # Intersect the H3 hexagons with the original geometries
-        gdf_hex['geometry'] = gdf_hex.geometry.apply(
-            lambda x: gdf.geometry.unary_union.intersection(x) if x.is_valid else x
-        )
-
-        # Remove any invalid geometries
-        gdf_hex = gdf_hex[gdf_hex.geometry.is_valid & ~gdf_hex.geometry.is_empty]
-        print(gdf_hex)
-        
-        ###########
+        gdf_hex = convert_to_h3(location, h3_zoom)
 
         # Example categories definition as a dictionary
         categories = {
@@ -257,12 +238,10 @@ def main(
             plt.legend()
             plt.title("Affinity Propagation Clusters with Exemplars (Distance + Point Count)")
             plt.show()
-            print(gdf_hex)
 
         else:
             print("No POI files found.")
 
-        print(gdf_hex)
 
 
         # It may need to execute the first cell firts
