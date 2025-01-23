@@ -1,7 +1,7 @@
 # PARAMETERS
 # These are values to loop through for different runs
 poi_source = "grid" # railwaystation, grid
-prune_measure = "betweenness" # betweenness, closeness, random
+prune_measure ="betweenness" # betweenness, clo seness, random
 
 SERVER = False # Whether the code runs on the server (important to avoid parallel job conflicts)
 
@@ -20,9 +20,235 @@ gridl = 1707 # in m, for generating the grid
 # 2*0.5 = a+a-sqrt(2)a   |   1 = a(2-sqrt2)   |   a = 1/(2-sqrt2) = 1.707
 # This leads to a full 500m coverage when a (worst-case) square is being triangulated
 bearingbins = 72 # number of bins to determine bearing. e.g. 72 will create 5 degrees bins
-poiparameters = {"railwaystation":{'railway':['station','halt']}#, # should maybe also add: ["railway"!~"entrance"], but afaik osmnx is not capable of this: https://osmnx.readthedocs.io/en/stable/osmnx.html?highlight=geometries_from_polygon#osmnx.geometries.geometries_from_polygon
-                 #"busstop":{'highway':'bus_stop'}
-                }
+
+h3_zoom = 8
+
+# Example slider value
+
+sanidad_slider = 5  
+educacion_slider = 6
+administracion_slider = 7
+aprovisionamiento_slider = 8
+cultura_slider = 9
+deporte_slider = 10
+transporte_slider = 10
+
+poiparameters = {
+    # Sanidad (Health)
+    "hospital": {'amenity': 'hospital'},
+    "clinic": {'amenity': 'clinic'},
+    "pharmacy": {'amenity': 'pharmacy'},
+    "dentist": {'amenity': 'dentist'},
+    "veterinary": {'amenity': 'veterinary'},
+    "daycare": {'amenity': 'social_facility', 'social_facility': 'day_care'},
+    "socialservices": {'amenity': 'social_facility'},
+    "doctors": {'amenity': 'doctors'},
+    "nursing_home": {'amenity': 'nursing_home'},
+    #"optician": {'shop': 'optician'},
+
+    # Educación (Education)
+    "school": {'amenity': 'school'},
+    "university": {'amenity': 'university'},
+    "kindergarten": {'amenity': 'kindergarten'},
+    "college": {'amenity': 'college'},
+    "training": {'amenity': 'training'},
+    "language_school": {'amenity': 'language_school'},
+    "music_school": {'amenity': 'music_school'},
+
+    # Administración (Administration)
+    "townhall": {'amenity': 'townhall'},
+    "courthouse": {'amenity': 'courthouse'},
+    "police": {'amenity': 'police'},
+    "firestation": {'amenity': 'fire_station'},
+    "postoffice": {'amenity': 'post_office'},
+    "media": {'office': 'media'},
+    "embassy": {'amenity': 'embassy'},
+    "recycling": {'amenity': 'recycling'},
+
+    # Aprovisionamiento (Supplies)
+    "supermarket": {'shop': 'supermarket'},
+    "mall": {'shop': 'mall'},
+    "bakery": {'shop': 'bakery'},
+    "butcher": {'shop': 'butcher'},
+    "greengrocer": {'shop': 'greengrocer'},
+    "marketplace": {'amenity': 'marketplace'},
+    "electronics": {'shop': 'electronics'},
+    "clothes": {'shop': 'clothes'},
+    "furniture": {'shop': 'furniture'},
+    "hardware": {'shop': 'hardware'},
+    "beverages": {'shop': 'beverages'},
+    "convenience": {'shop': 'convenience'},
+
+    # Cultura/Ocio (Culture/Leisure)
+    "museum": {'tourism': 'museum'},
+    "theatre": {'amenity': 'theatre'},
+    "cinema": {'amenity': 'cinema'},
+    "library": {'amenity': 'library'},
+    "park": {'leisure': 'park'},
+    "playground": {'leisure': 'playground'},
+    "communitycentre": {'amenity': 'community_centre'},
+    "art_gallery": {'tourism': 'art_gallery'},
+    "zoo": {'tourism': 'zoo'},
+    "theme_park": {'tourism': 'theme_park'},
+
+        # Otros (Others)
+    "place_of_worship": {'amenity': 'place_of_worship'},
+    "atm": {'amenity': 'atm'},
+    "bank": {'amenity': 'bank'},
+    "restaurant": {'amenity': 'restaurant'},
+    "cafe": {'amenity': 'cafe'},
+    "bar": {'amenity': 'bar'},
+    "fast_food": {'amenity': 'fast_food'},
+    "hotel": {'tourism': 'hotel'},
+    "hostel": {'tourism': 'hostel'},
+    "camp_site": {'tourism': 'camp_site'},
+    "public_toilet": {'amenity': 'toilets'},
+    "fountain": {'amenity': 'fountain'},
+
+
+    # Deporte (Sports)
+    "sportscentre": {'leisure': 'sports_centre'},  # General sports center
+    "stadium": {'leisure': 'stadium'},  # Sports stadiums
+    "swimmingpool": {'leisure': 'swimming_pool'},  # Swimming pools
+    "pitch": {'leisure': 'pitch'},  # Sports pitches (soccer, rugby, etc.)
+    "fitnesscentre": {'leisure': 'fitness_centre'},  # Fitness gyms and centers
+    "outdoor_sports": {'leisure': 'sports'},  # General outdoor sports areas
+    "climbing": {'sport': 'climbing'},  # Rock climbing walls and facilities
+    "golf_course": {'leisure': 'golf_course'},  # Golf courses
+    "tennis": {'leisure': 'pitch', 'sport': 'tennis'},  # Tennis courts
+    "basketball": {'leisure': 'pitch', 'sport': 'basketball'},  # Basketball courts
+    "skatepark": {'leisure': 'skatepark'},  # Skateboarding parks
+    "equestrian": {'sport': 'equestrian'},  # Equestrian facilities
+    "ice_rink": {'leisure': 'ice_rink'},  # Ice skating rinks
+    "bowling": {'amenity': 'bowling_alley'},  # Bowling alleys
+    "running_track": {'leisure': 'track', 'sport': 'running'},  # Running tracks
+    "table_tennis": {'sport': 'table_tennis'},  # Table tennis facilities
+    "squash": {'sport': 'squash'},  # Squash courts
+    "volleyball": {'sport': 'volleyball'},  # Volleyball courts
+    "cricket": {'sport': 'cricket'},  # Cricket pitches
+    "baseball": {'sport': 'baseball'},  # Baseball diamonds
+    "boating": {'leisure': 'marina'},  # Boating and marinas
+    "fishing": {'leisure': 'fishing'},  # Fishing areas
+    "shooting": {'sport': 'shooting'},  # Shooting ranges
+    "archery": {'sport': 'archery'},  # Archery ranges
+    "surfing": {'sport': 'surfing'},  # Surfing spots
+    "skiing": {'sport': 'skiing'},  # Skiing facilities
+    "motor_sports": {'sport': 'motor'},  # Motor sports facilities
+    "cycling": {'sport': 'cycling'},  # Cycling tracks or paths
+    "rowing": {'sport': 'rowing'},  # Rowing facilities
+    "karate": {'sport': 'karate'},  # Karate or martial arts dojos
+    "yoga": {'sport': 'yoga'},  # Yoga centers or studios
+    "paddle": {'sport': 'paddle_tennis'},  # Paddle tennis courts
+    "rugby": {'sport': 'rugby'},  # Rugby pitches
+    "hockey": {'sport': 'hockey'},  # Hockey fields or rinks
+    "badminton": {'sport': 'badminton'},  # Badminton courts
+    "diving": {'sport': 'diving'},  # Diving facilities
+    "horse_racing": {'sport': 'horse_racing'},  # Horse racing tracks
+    "skating": {'sport': 'skating'},  # Skating rinks or facilities
+    "kitesurfing": {'sport': 'kitesurfing'},  # Kitesurfing locations
+    "paragliding": {'sport': 'paragliding'},  # Paragliding locations
+    "windsurfing": {'sport': 'windsurfing'},  # Windsurfing spots
+    "aerobics": {'sport': 'aerobics'},  # Aerobics studios
+    "parkour": {'sport': 'parkour'},  # Parkour parks or spots
+    "futsal": {'sport': 'futsal'},  # Futsal pitches
+
+    # Transporte (Transport)
+   "railwaystation": {'railway': ['station', 'halt']},  # Train stations and halts
+    "busstop": {'highway': 'bus_stop'},  # Bus stops
+    "tramstop": {'railway': 'tram_stop'},  # Tram stops
+    "subwayentrance": {'railway': 'subway_entrance'},  # Subway entrances
+    "taxistand": {'amenity': 'taxi'},  # Taxi stands
+    "parking": {'amenity': 'parking'},  # Parking lots
+    "bicyclerental": {'amenity': 'bicycle_rental'},  # Bicycle rental services
+    "car_rental": {'amenity': 'car_rental'},  # Car rental services
+    "fuel": {'amenity': 'fuel'},  # Fuel stations
+    "charging_station": {'amenity': 'charging_station'},  # EV charging stations
+    "ferry_terminal": {'amenity': 'ferry_terminal'},  # Ferry terminals
+    "aerodrome": {'aeroway': 'aerodrome'},  # Small airfields and private airports
+    "airport": {'aeroway': 'airport'},  # Airports
+    "helipad": {'aeroway': 'helipad'},  # Helipads
+    "bus_station": {'amenity': 'bus_station'},  # Bus stations
+    "coach_stop": {'amenity': 'coach_station'},  # Long-distance coach stops
+    "motorcycle_parking": {'amenity': 'motorcycle_parking'},  # Motorcycle parking areas
+    "bicycle_parking": {'amenity': 'bicycle_parking'},  # Bicycle parking areas
+    "train_crossing": {'railway': 'level_crossing'},  # Railway level crossings
+    "tramway": {'railway': 'tram'},  # Tramway infrastructure
+    "subway_station": {'railway': 'subway'},  # Subway stations
+    "monorail": {'railway': 'monorail'},  # Monorail systems
+    "light_rail": {'railway': 'light_rail'},  # Light rail stations
+    "park_and_ride": {'amenity': 'park_and_ride'},  # Park-and-ride facilities
+    "bus_shelter": {'amenity': 'shelter', 'shelter_type': 'public_transport'},  # Bus shelters
+    "cargo_terminal": {'landuse': 'depot'},  # Cargo or freight terminals
+    "container_terminal": {'man_made': 'container_terminal'},  # Shipping container terminals
+    "seaport": {'amenity': 'seaport'},  # Seaports
+    "dock": {'man_made': 'dock'},  # Docks
+    "carpool_parking": {'amenity': 'carpool_parking'},  # Carpool parking lots
+    "toll_booth": {'barrier': 'toll_booth'},  # Toll booths
+    "customs": {'amenity': 'customs'},  # Customs facilities at borders
+    "weigh_station": {'amenity': 'weighbridge'},  # Weigh stations for trucks
+    "pier": {'man_made': 'pier'},  # Piers and wharfs
+    "boat_rental": {'amenity': 'boat_rental'},  # Boat rental services
+    "canoe_rental": {'sport': 'canoe'},  # Canoe or kayak rentals
+    "car_sharing": {'amenity': 'car_sharing'},  # Car sharing services
+    "roadside_rest_area": {'highway': 'rest_area'},  # Roadside rest areas
+    "service_area": {'highway': 'services'},  # Service areas on highways
+    "bike_repair_station": {'amenity': 'bicycle_repair_station'},  # Bicycle repair stations
+    "tram_depot": {'railway': 'tram_depot'},  # Tram depots
+    "bus_depot": {'railway': 'bus_depot'},  # Bus depots
+    "cable_car": {'aerialway': 'cable_car'},  # Cable car systems
+    "gondola": {'aerialway': 'gondola'},  # Gondola lifts
+    "chair_lift": {'aerialway': 'chair_lift'},  # Chair lifts
+    "funicular": {'aerialway': 'funicular'},  # Funicular railways
+
+}
+
+
+sanidad = {    "hospital": {'amenity': 'hospital'},
+    "clinic": {'amenity': 'clinic'},
+    "pharmacy": {'amenity': 'pharmacy'},
+    "dentist": {'amenity': 'dentist'},
+    "veterinary": {'amenity': 'veterinary'}}
+
+educacion =     {"school": {'amenity': 'school'},
+    "university": {'amenity': 'university'},
+    "kindergarten": {'amenity': 'kindergarten'},
+    "college": {'amenity': 'college'}}
+
+administracion = {    "townhall": {'amenity': 'townhall'},
+    "courthouse": {'amenity': 'courthouse'},
+    "police": {'amenity': 'police'},
+    "firestation": {'amenity': 'fire_station'},
+    "postoffice": {'amenity': 'post_office'}}
+
+aprovisionamiento = { "supermarket": {'shop': 'supermarket'},
+    "mall": {'shop': 'mall'},
+    "bakery": {'shop': 'bakery'},
+    "butcher": {'shop': 'butcher'},
+    "greengrocer": {'shop': 'greengrocer'},
+    "marketplace": {'amenity': 'marketplace'}}
+
+cultura = {  "museum": {'tourism': 'museum'},
+    "theatre": {'amenity': 'theatre'},
+    "cinema": {'amenity': 'cinema'},
+    "library": {'amenity': 'library'},
+    "park": {'leisure': 'park'},
+    "playground": {'leisure': 'playground'}}
+
+deporte = {  
+    "sportscentre": {'leisure': 'sports_centre'},
+    "stadium": {'leisure': 'stadium'},
+    "swimmingpool": {'leisure': 'swimming_pool'},
+    "pitch": {'leisure': 'pitch'},
+    "fitnesscentre": {'leisure': 'fitness_centre'}}
+
+transporte = {
+    "railwaystation": {'railway': ['station', 'halt']},
+    "busstop": {'highway': 'bus_stop'},
+    "tramstop": {'railway': 'tram_stop'},
+    "subwayentrance": {'railway': 'subway_entrance'},
+    "taxistand": {'amenity': 'taxi'},
+    "parking": {'amenity': 'parking'}
+}
 
 # 04
 buffer_walk = 500 # Buffer in m for coverage calculations. (How far people are willing to walk)
