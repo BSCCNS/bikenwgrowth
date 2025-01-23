@@ -32,6 +32,7 @@ from matplotlib.ticker import MaxNLocator
 # Geo
 import osmnx as ox
 import shapely
+from tobler.util import h3fy
 from haversine import haversine, haversine_vector
 import pyproj
 from shapely.geometry import Point, LineString, Polygon
@@ -493,6 +494,35 @@ def ig_to_geojson(G):
 
 
 # NETWORK GENERATION
+
+def convert_to_h3(location, h3_zoom):
+    """
+    Converts a given geometry into H3 hexagons, intersects them with the original geometry, 
+    and filters out invalid geometries.
+    
+    Parameters:
+    - location: shapely.geometry object representing the geometry to process.
+    - h3_zoom: int, the H3 resolution to use.
+    
+    Returns:
+    - GeoDataFrame with H3 hexagons intersected with the original geometry.
+    """
+    # Ensure `location` is a GeoDataFrame
+    gdf = gpd.GeoDataFrame(geometry=[location], crs="EPSG:4326")
+    
+    # Convert the original geometries to H3 hexagons
+    gdf_hex = h3fy(gdf, resolution=h3_zoom)
+    
+    # Intersect the H3 hexagons with the original geometries
+    gdf_hex['geometry'] = gdf_hex.geometry.apply(
+        lambda x: gdf.geometry.unary_union.intersection(x) if x.is_valid else x
+    )
+    
+    # Remove any invalid geometries
+    gdf_hex = gdf_hex[gdf_hex.geometry.is_valid & ~gdf_hex.geometry.is_empty]
+    
+    return gdf_hex
+
 
 def highest_closeness_node(G):
     closeness_values = G.closeness(weights = 'weight')
